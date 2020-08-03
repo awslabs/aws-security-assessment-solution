@@ -83,8 +83,6 @@ When enabled, this module will deploy separate functions that can help customers
 
 + AmazonLinux SSM scanner Lambda function
   + This Lambda function will illustrate how you can use SSM to scan an EC2 instance for file extensions that are associated with ransomeware infection.
-+ S3 object name scanner
-  + Similar to the SSM example, this lambda function will scan S3 object names for file extensions that are associated with ransomeware infection.
 + AWS Core security services enabled
   + Checks for AWS security service enablement in all regions where applicable (GuardDuty, SecurityHub)
 + Data protection checks
@@ -104,7 +102,7 @@ When enabled, this module will deploy separate functions that can help customers
      + No. This is a one-time assessment, we urge customers to leverage tooling like [AWS SecurityHub](https://aws.amazon.com/security-hub/) for Ongoing assessments.
 3.	Why does the CloudFormation service error when deleting the stack?
      + You must remove the objects (reports) out of the S3 bucket first
-4.	Not at this time. In a future sprint we plan to incorporate integration with AWS services like Security Hub and GuardDuty. However, you can follow the instructions in [this blog](https://aws.amazon.com/blogs/security/use-aws-fargate-prowler-send-security-configuration-findings-about-aws-services-security-hub/)to integrate Prowler and Security Hub.
+4.	Not at this time. In a future sprint we plan to incorporate integration with AWS services like Security Hub and GuardDuty. However, you can follow the instructions in [this blog](https://aws.amazon.com/blogs/security/use-aws-fargate-prowler-send-security-configuration-findings-about-aws-services-security-hub/) to integrate Prowler and Security Hub.
 5.	How do I remediate the issues in the reports?
     + Generally, the issues should be described in the report with readily identifiable corrections. Please follow up with the public documentation for each tool (Prowler and ScoutSuite) as well. If this is insufficient, please reach out to your AWS Account team and we will be more than happy to help you understand the reports and work towards remediating issues.
 
