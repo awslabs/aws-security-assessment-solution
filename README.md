@@ -102,7 +102,7 @@ When enabled, this module will deploy separate functions that can help customers
      + No. This is a one-time assessment, we urge customers to leverage tooling like [AWS SecurityHub](https://aws.amazon.com/security-hub/) for Ongoing assessments.
 3.	Why does the CloudFormation service error when deleting the stack?
      + You must remove the objects (reports) out of the S3 bucket first
-4.	Do these reports currently work with other AWS Security Service?
+4.	Do these reports currently work with other AWS Security Services?
      + Not at this time. In a future sprint we plan to incorporate integration with AWS services like Security Hub and GuardDuty. However, you can follow the instructions in [this blog](https://aws.amazon.com/blogs/security/use-aws-fargate-prowler-send-security-configuration-findings-about-aws-services-security-hub/) to integrate Prowler and Security Hub.
 5.	How do I remediate the issues in the reports?
     + Generally, the issues should be described in the report with readily identifiable corrections. Please follow up with the public documentation for each tool (Prowler and ScoutSuite) as well. If this is insufficient, please reach out to your AWS Account team and we will be more than happy to help you understand the reports and work towards remediating issues.
