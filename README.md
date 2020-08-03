@@ -18,10 +18,10 @@ Once the EC2 Instance has been created and begins, the two assessments it will t
 
 
 ## How to deploy this tool
-* See the following guide on installation steps
+* See the [following guide](docs/how-to-deploy.md) on installation steps
 
 ## How do I read the reports?
-* See the following guide on accessing and reading the report outputs
+* See the [following guide](docs/how-to-read-reports.md) on accessing and reading the report outputs
 
 ## Diagram
 Here is a diagram of the architecture.
