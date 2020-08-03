@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation templates for https://github.com/awslabs/aws-security-assessment-solution
+
+Parameters:
+  TemplateS3Bucket:
+    Description: The name of the bucket you created to upload the project files.
+    Type: String
+    Default: YourBucketNameHere
+
+  RansomwareChecks:
+    Description: "Enable Ransomware checks"
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+Conditions:
+  EnableRansomwareChecks: !Equals
+    - !Ref RansomwareChecks
+    - 'true'
+
+Resources:
+  # Basic VPC required for the Security Review. This will create a VPC with 2 subnets in a single AZ. It will also create a NATGateway and a few VPC Endpoints.
+  rVPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.amazonaws.com/SelfServiceSecVPC.yml'
+  # This will create a single Role for EC2 Instance, leverage a few AWS Managed Policies and a few custom policies so Prowler and ScoutSuite can run.
+  rIAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.amazonaws.com/SelfServiceSecIAM.yml'
+      Parameters:
+        SelfServiceSecS3Bucket: !GetAtt
+            - rS3Stack
+            - Outputs.SelfServiceSecS3Bucket
+  #This will create a Bucket where the output of Prowler and ScoutSuite will be delivered
+  rS3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.amazonaws.com/SelfServiceSecS3.yml'
+  #This will create a single Instance using Amazon Linux 2, and install/deploy Prowler and ScoutSuite
+  rEC2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.amazonaws.com/SelfServiceSecEC2.yml'
+      Parameters:
+        SelfServiceSecVPCID: !GetAtt
+            - rVPCStack
+            - Outputs.SelfServiceSecVPCID
+        SubnetAID: !GetAtt
+            - rVPCStack
+            - Outputs.SubnetAID
+        InstanceRoleName: !GetAtt
+            - rIAMStack
+            - Outputs.InstanceRoleName
+        SelfServiceSecS3Bucket: !GetAtt
+            - rS3Stack
+            - Outputs.SelfServiceSecS3Bucket
+  #This will enable the optional ransomeware checks
+  rRansomwareChecks:
+    Condition: EnableRansomwareChecks
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.amazonaws.com/SelfServiceSecRansomware.yml'
+      Parameters:
+        InstanceRoleARN: !GetAtt
+          - rIAMStack
+          - Outputs.InstanceRoleARN
+        TemplatesS3Bucket: !Ref TemplateS3Bucket
+        SelfServiceSecS3Bucket: !GetAtt
+            - rS3Stack
+            - Outputs.SelfServiceSecS3Bucket
+Outputs:
+  ReportBucketName:
+    Description: The name of the newly generated S3 Bucket with reports from the tool
+    Value: !GetAtt rS3Stack.Outputs.SelfServiceSecS3Bucket

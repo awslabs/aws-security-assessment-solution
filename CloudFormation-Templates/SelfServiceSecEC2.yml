@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to launch an Instance for self service Security Review
+Parameters:
+  SelfServiceSecVPCID:
+    Type: String
+  SubnetAID:
+    Type: String
+  SelfServiceSecS3Bucket:
+    Type: String
+  InstanceRoleName:
+    Type: String
+  LatestAmiId:
+    Type:  'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+Resources:
+  rInstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "SelfServiceSec Security Instance SG"
+      VpcId: !Ref SelfServiceSecVPCID
+      Tags:
+      - Key: Name
+        Value: "SelfServiceSecSecuriyGroup"
+  rEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: m5a.large
+      Tags:
+      - Key: Name
+        Value: "SelfServiceSecSecurityInstance"
+      SecurityGroupIds:
+       - !GetAtt "rInstanceSG.GroupId"
+      ImageId: !Ref 'LatestAmiId'
+      SubnetId: !Ref SubnetAID
+      IamInstanceProfile: !Ref InstanceRoleName
+      # This will update the Instance, pull Prowler and ScoutSuite, run them and then write to the output to the S3 Bucket
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum -y install git python-pip jq python3
+          pip install awscli ansi2html detect-secrets
+          cd /root
+          git clone https://github.com/toniblyx/prowler
+          git clone https://github.com/nccgroup/ScoutSuite.git
+          cd prowler
+          aws configure set default.region ${AWS::Region}
+          ./prowler -q | tee prowler-output.txt
+          aws s3 cp prowler-output.txt s3://${SelfServiceSecS3Bucket}
+          cd /root/ScoutSuite/
+          pip install virtualenv
+          virtualenv -p python3 venv
+          source ./venv/bin/activate
+          pip install -r requirements.txt
+          python scout.py aws
+          zip -r scoutsuite-report.zip  scoutsuite-report
+          aws s3 cp scoutsuite-report.zip s3://${SelfServiceSecS3Bucket}
+          /sbin/init 0

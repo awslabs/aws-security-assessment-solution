@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation templates to create a new Bucket for self service Security Reviews
+Resources:
+  # Create a random name S3 bucket for the outputs to be placed
+    rCentralizedBucket:
+      DeletionPolicy: Delete
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+Outputs:
+  SelfServiceSecS3Bucket:
+    Description: 'Bucket Name'
+    Value: !Ref rCentralizedBucket

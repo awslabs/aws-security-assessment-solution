@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template IAM Role for SelfServiceSec Security
+Parameters:
+  SelfServiceSecS3Bucket:
+    Type: String
+Resources:
+  #This is the only Role created
+  rSelfServiceSecSecurityRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ssm.amazonaws.com
+            - ec2.amazonaws.com
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      #Managed Policies attached for ScoutSuite
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/IAMReadOnlyAccess
+      - arn:aws:iam::aws:policy/SecurityAudit
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Path: "/"
+      RoleName: SelfServiceSecSecurityRole
+  # The Instance Profile is required for EC2 Instance Roles
+  rSelfServiceSecSecurityInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: SelfServiceSecSecurityRole
+      Path: "/"
+      Roles:
+        - !Ref rSelfServiceSecSecurityRole
+  #This policy is required to write the output to the Bucket
+  rSelfServiceSecS3Policy:
+   Type: AWS::IAM::ManagedPolicy
+   Properties:
+    Roles:
+    - !Ref rSelfServiceSecSecurityRole
+    Description: Policy for SelfServiceSec Reports
+    Path: "/"
+    PolicyDocument:
+      Version: '2012-10-17'
+      Statement:
+      - Action:
+        - s3:PutObject
+        Effect: Allow
+        Resource: !Join
+            - ''
+            - - 'arn:'
+              - !Ref 'AWS::Partition'
+              - ':s3:'
+              - '::'
+              - !Ref SelfServiceSecS3Bucket
+              - '/*'
+  #Additional Rights as required by Prowler
+  rSelfServiceSecProwlerPolicy:
+   Type: AWS::IAM::ManagedPolicy
+   Properties:
+    Roles:
+    - SelfServiceSecSecurityRole
+    Description: Policy for Prowler
+    Path: "/"
+    PolicyDocument:
+      Version: '2012-10-17'
+      Statement:
+      - Action:
+        - access-analyzer:List*
+        - apigateway:get*
+        - apigatewayv2:get*
+        - aws-marketplace:viewsubscriptions
+        - batch:listjobs
+        - clouddirectory:listappliedschemaarns
+        - clouddirectory:listdevelopmentschemaarns
+        - clouddirectory:listpublishedschemaarns
+        - cloudformation:list*
+        - cloudhsm:listavailablezones
+        - cloudsearch:list*
+        - cloudwatch:get*
+        - cloudwatch:list*
+        - codebuild:listbuilds*
+        - codestar:verify*
+        - cognito-identity:listidentities
+        - cognito-idp:list*
+        - cognito-sync:listdatasets
+        - connect:list*
+        - datapipeline:getaccountlimits
+        - dax:describeclusters
+        - dax:describedefaultparameters
+        - dax:describeevents
+        - dax:describeparametergroups
+        - dax:describeparameters
+        - dax:describesubnetgroups
+        - dax:describetable
+        - dax:listtables
+        - devicefarm:list*
+        - discovery:list*
+        - dms:list*
+        - ds:ListAuthorizedApplications
+        - ds:DescribeRoles
+        - dynamodb:describebackup
+        - dynamodb:describeglobaltablesettings
+        - dynamodb:describelimits
+        - dynamodb:describereservedcapacity
+        - dynamodb:describereservedcapacityofferings
+        - dynamodb:describestream
+        - dynamodb:listtagsofresource
+        - ec2:get*
+        - ec2:DescribeInstances
+        - ecr:describe*
+        - ecr:listimages
+        - elasticbeanstalk:listavailablesolutionstacks
+        - elasticmapreduce:list*
+        - elastictranscoder:list*
+        - gamelift:list*
+        - glacier:list*
+        - importexport:listjobs
+        - lambda:GetAccountSettings
+        - lambda:GetFunctionConfiguration
+        - lambda:GetLayerVersionPolicy
+        - lambda:GetPolicy
+        - lambda:List*
+        - lex:getbotaliases
+        - lex:getbotchannelassociations
+        - lex:getbots
+        - lex:getbotversions
+        - lex:getintents
+        - lex:getintentversions
+        - lex:getslottypes
+        - lex:getslottypeversions
+        - lex:getutterancesview
+        - lightsail:getblueprints
+        - lightsail:getbundles
+        - lightsail:getinstancesnapshots
+        - lightsail:getkeypair
+        - lightsail:getregions
+        - lightsail:getstaticips
+        - lightsail:isvpcpeered
+        - machinelearning:describe*
+        - mobilehub:listavailablefeatures
+        - mobilehub:listavailableregions
+        - mobilehub:listprojects
+        - mobiletargeting:getapplicationsettings
+        - mobiletargeting:getcampaigns
+        - mobiletargeting:getimportjobs
+        - mobiletargeting:getsegments
+        - opsworks-cm:describe*
+        - opsworks:describe*
+        - polly:describe*
+        - polly:list*
+        - redshift:viewqueriesinconsole
+        - route53domains:list*
+        - s3:listbucket
+        - sdb:list*
+        - secretsmanager:listsecretversionids
+        - servicecatalog:list*
+        - ses:list*
+        - sns:list*
+        - sqs:listqueuetags
+        - ssm:listassociations
+        - states:listactivities
+        - support:describe*
+        - swf:list*
+        - tag:gettagkeys
+        - trustedadvisor:describe*
+        - waf-regional:list*
+        - waf:list*
+        - workdocs:describeavailabledirectories
+        - workdocs:describeinstances
+        - workmail:describe*
+        - backup:ListBackupJobs
+        - ssm:SendCommand
+        Effect: Allow
+        Resource: "*"
+Outputs:
+  InstanceRoleName:
+    Description: 'Instance Role'
+    Value: !Ref rSelfServiceSecSecurityRole
+  InstanceRoleARN:
+    Description: 'Instance Role ARN'
+    Value: !GetAtt rSelfServiceSecSecurityRole.Arn
