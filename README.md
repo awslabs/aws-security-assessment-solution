@@ -26,7 +26,7 @@ Once the EC2 Instance has been created and begins, the two assessments it will t
 ## Diagram
 Here is a diagram of the architecture.
 
-![screenshot](img/simplediagram1.png)
+![screenshot](docs/img/simplediagram1.png)
 
 ### What will be created
 
