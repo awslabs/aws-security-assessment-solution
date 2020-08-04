@@ -94,7 +94,7 @@ When enabled, this module will deploy separate functions that can help customers
   + Checks for S3 deny public access enablement
 
 
-# Frequenly Asked Questions (FAQ)
+# Frequently Asked Questions (FAQ)
 
 1.	Is there a cost?
     + Yes. This should normally cost less than $1 for an hour of use.
