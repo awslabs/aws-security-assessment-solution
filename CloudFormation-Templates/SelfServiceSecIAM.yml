@@ -60,7 +60,7 @@ Resources:
    Type: AWS::IAM::ManagedPolicy
    Properties:
     Roles:
-    - SelfServiceSecSecurityRole
+    - !Ref rSelfServiceSecSecurityRole
     Description: Policy for Prowler
     Path: "/"
     PolicyDocument:
