@@ -15,6 +15,7 @@ Parameters:
       - 'true'
       - 'false'
 Conditions:
+# This will enable the optional ransomware specific modules  
   EnableRansomwareChecks: !Equals
     - !Ref RansomwareChecks
     - 'true'
@@ -28,7 +29,9 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3.amazonaws.com/SelfServiceSecVPC.yml'
+          - '.s3-'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecVPC.yml'
   # This will create a single Role for EC2 Instance, leverage a few AWS Managed Policies and a few custom policies so Prowler and ScoutSuite can run.
   rIAMStack:
     Type: AWS::CloudFormation::Stack
@@ -37,7 +40,9 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3.amazonaws.com/SelfServiceSecIAM.yml'
+          - '.s3-'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecIAM.yml'
       Parameters:
         SelfServiceSecS3Bucket: !GetAtt
             - rS3Stack
@@ -50,7 +55,9 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3.amazonaws.com/SelfServiceSecS3.yml'
+          - '.s3-'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecS3.yml'
   #This will create a single Instance using Amazon Linux 2, and install/deploy Prowler and ScoutSuite
   rEC2Stack:
     Type: AWS::CloudFormation::Stack
@@ -59,7 +66,9 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3.amazonaws.com/SelfServiceSecEC2.yml'
+          - '.s3-'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecEC2.yml'
       Parameters:
         SelfServiceSecVPCID: !GetAtt
             - rVPCStack
@@ -82,7 +91,9 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3.amazonaws.com/SelfServiceSecRansomware.yml'
+          - '.s3-'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecRansomware.yml'
       Parameters:
         InstanceRoleARN: !GetAtt
           - rIAMStack

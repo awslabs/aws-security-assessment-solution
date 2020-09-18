@@ -7,7 +7,10 @@ Parameters:
     Type: String
   TemplatesS3Bucket:
     Type: String
-
+Conditions:
+  CreateGovCloudResources: !Equals [ !Ref "AWS::Partition", aws ]
+# Currently two features are not supported in GovCloud so we omit these two checks below with this partition check.
+ 
 Resources:
   # rSSMRansomwareScanner:
   #   Type: "AWS::SSM::Document"
@@ -131,6 +134,7 @@ Resources:
 
   rLambdaCheckForS3StaleAccess:
     Type: "AWS::Lambda::Function"
+    Condition: CreateGovCloudResources
     Properties:
       Code:
         S3Bucket: !Ref TemplatesS3Bucket
@@ -150,11 +154,13 @@ Resources:
 
   xLambdaCheckForS3StaleAccess:
     Type: AWS::CloudFormation::CustomResource
+    Condition: CreateGovCloudResources
     Properties:
       ServiceToken: !GetAtt rLambdaCheckForS3StaleAccess.Arn
 
   rLambdaCheckForSSMUse:
     Type: "AWS::Lambda::Function"
+    Condition: CreateGovCloudResources
     Properties:
       Code:
         S3Bucket: !Ref TemplatesS3Bucket
@@ -174,6 +180,7 @@ Resources:
 
   xLambdaCheckForSSMUse:
     Type: AWS::CloudFormation::CustomResource
+    Condition: CreateGovCloudResources
     Properties:
       ServiceToken: !GetAtt rLambdaCheckForSSMUse.Arn
 
