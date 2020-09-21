@@ -15,7 +15,7 @@ Parameters:
       - 'true'
       - 'false'
 Conditions:
-# This will enable the optional ransomware specific modules  
+# This will enable the optional ransomware specific modules
   EnableRansomwareChecks: !Equals
     - !Ref RansomwareChecks
     - 'true'
@@ -29,7 +29,7 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3-'
+          - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecVPC.yml'
   # This will create a single Role for EC2 Instance, leverage a few AWS Managed Policies and a few custom policies so Prowler and ScoutSuite can run.
@@ -40,7 +40,7 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3-'
+          - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecIAM.yml'
       Parameters:
@@ -55,7 +55,7 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3-'
+          - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecS3.yml'
   #This will create a single Instance using Amazon Linux 2, and install/deploy Prowler and ScoutSuite
@@ -66,7 +66,7 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3-'
+          - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecEC2.yml'
       Parameters:
@@ -91,7 +91,7 @@ Resources:
         - ''
         - - 'https://'
           - !Ref TemplateS3Bucket
-          - '.s3-'
+          - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecRansomware.yml'
       Parameters:
