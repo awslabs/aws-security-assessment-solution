@@ -2,7 +2,7 @@
 
 Cybersecurity remains a very important topic and point of concern for many CIOs, CISOs, and their customers. To meet these important concerns, AWS has developed a primary set of services customers should use to aid in protecting their accounts. Amazon GuardDuty, AWS Security Hub, AWS Config, and AWS Well-Architected reviews help customers maintain a strong security posture over their AWS accounts. As more organizations deploy to the cloud, especially if they are doing so quickly, and they have not yet implemented the recommended AWS Services, there may be a need to conduct a rapid security assessment of the cloud environment.
 
-With that in mind, we have worked to develop an inexpensive, easy to deploy, secure, and fast solution to provide our customers two (2) security assessment reports. These security assessments are from the open source projects “[prowler](https://github.com/toniblyx/prowler)” and “[ScoutSuite](https://github.com/nccgroup/ScoutSuite).” Each of these projects conduct an assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can also do that by following the instructions in [this blog](https://aws.amazon.com/blogs/security/use-aws-fargate-prowler-send-security-configuration-findings-about-aws-services-security-hub/).
+With that in mind, we have worked to develop an inexpensive, easy to deploy, secure, and fast solution to provide our customers two (2) security assessment reports. These security assessments are from the open source projects “[Prowler](https://github.com/toniblyx/prowler)” and “[ScoutSuite](https://github.com/nccgroup/ScoutSuite).” Each of these projects conduct an assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can also do that from Prowler natively following instructions [here](https://github.com/toniblyx/prowler#security-hub-integration).
 
 In addition, we have developed custom modules that speak to customer concerns around threats and misconfigurations of those issues, currently this includes checks for ransomware specific findings.
 
@@ -10,7 +10,7 @@ In addition, we have developed custom modules that speak to customer concerns ar
 # ARCHITECTURE OVERVIEW
 
 ## Overview - Open Source project checks
-The architecture we deploy is a very simple VPC with two (2) subnets, one (1) NAT Gateway, one (1) EC2 instance, and one (1) S3 Bucket. The EC2 instance is using Amazon Linux 2 (the latest published AMI), that is patched on boot, pulls down the two projects (prowler and ScoutSuite), runs the assessments and then delivers the reports to the S3 Bucket. The EC2 instances does not deploy with any EC2 Key Pair, does not have any open ingress rules on its Security Group, and is placed in the Private Subnet so it does not have direct internet access. After completion of the assessment and the delivery of the reports the system can be terminated.
+The architecture we deploy is a very simple VPC with two (2) subnets, one (1) NAT Gateway, one (1) EC2 instance, and one (1) S3 Bucket. The EC2 instance is using Amazon Linux 2 (the latest published AMI), that is patched on boot, pulls down the two projects (Prowler and ScoutSuite), runs the assessments and then delivers the reports to the S3 Bucket. The EC2 instances does not deploy with any EC2 Key Pair, does not have any open ingress rules on its Security Group, and is placed in the Private Subnet so it does not have direct internet access. After completion of the assessment and the delivery of the reports the system can be terminated.
 
 The deployment is accomplished through the use of CloudFormation. A single CloudFormation template is used to launch a few other templates (in a modular approach). No parameters (user input) is required and the automated build out of the environment will take on average less than 10 minutes to complete. These templates are provided for review in this Github repository.
 
@@ -64,12 +64,12 @@ Here is a diagram of the architecture.
 
 ## Open source security Assessments
 
-These security assessments are from the open source projects “prowler” and “ScoutSuite.” Each of these projects conduct an assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment.
+These security assessments are from the open source projects “Prowler” and “ScoutSuite.” Each of these projects conduct an assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment.
 
 ## 1. Prowler
 
 The first assessment is from [Prowler](https://github.com/toniblyx/prowler).
-+ Prowler follows guidelines of the CIS Amazon Web Services Foundations Benchmark (49 checks) and has 40 additional checks including related to GDPR and HIPAA, in total Prowler offers over 140 checks.
++ Prowler follows guidelines of the CIS Amazon Web Services Foundations Benchmark (49 checks) and has 40 additional checks including related to GDPR and HIPAA, in total Prowler offers over 160 checks.
 
 ## 2. ScoutSuite
 
