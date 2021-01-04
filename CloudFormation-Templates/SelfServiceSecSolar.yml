@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation templates for https://github.com/awslabs/aws-security-assessment-solution
+
+Parameters:
+    FlowLogsDatabase:
+      Type: String
+      Description: Athena database name that includes your VPC Flow Logs
+      Default: default
+
+    FlowLogsIOC:
+      Type: String
+      Description: Athena Flow logs table name for your VPC Flow Logs
+      Default: flowlogs
+
+    DNSLogsDatabase:
+      Type: String
+      Description: Athena database name that includes your Route53 DNS Logs
+      Default: default
+
+    DNSLogsIOC:
+      Type: String
+      Description: Athena DNS logs table name for your Route53 DNS Logs
+      Default: route53query
+
+Resources:
+  SSMHashAutomation:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        description: "Query files for Solarwind hashes based on CISA Appendix A: Affected SolarWinds Orion Products"
+        schemaVersion: "0.3"
+        parameters:
+          InstanceIds:
+            type: String
+        mainSteps:
+        - name: FindSFileHashes
+          action: 'aws:runCommand'
+          outputs:
+            - Selector: $.Payload.message
+              Name: message
+              Type: String
+          inputs:
+            DocumentName: AWS-RunPowerShellScript
+            InstanceIds:
+              - '{{ InstanceIds }}'
+            Parameters:
+              commands: |-
+                try {
+                    cd C:\
+                    if (!(Test-Path SWHash)) {mkdir SWHash} else {cd SWHash}
+                    Get-ChildItem -path C:\ -include *SolarWinds.Orion.Core.BusinessLayer*.* -recurse -ErrorAction SilentlyContinue | Get-FileHash | Out-File -FilePath .\hash-host.txt -Encoding ASCII -Width 500
+                    Write-Host "Getting file hashes from Solarwinds .dll's & searching for matches from CISA Alert AA20-352A, appendix A and B..."
+
+                    $SWHash = Select-String -Path .\hash-host.txt -Pattern 'a25cadd48d70f6ea0c4a241d99c5241269e6faccb4054e62d16784640f8e53bc','9bee4af53a8cdd7ecabe5d0c77b6011abe887ac516a5a22ad51a058830403690','bb86f66d11592e3312cd03423b754f7337aeebba9204f54b745ed3821de6252d','ae6694fd12679891d95b427444466f186bcdcc79bc0627b590e0cb40de1928ad','9d6285db647e7eeabdb85b409fad61467de1655098fec2e25aeb7770299e9fee','dab758bf98d9b36fa057a66cd0284737abf89857b73ca89280267ee7caf62f3b','32519b85c0b422e4656de6e6c41878e95fd95026267daab4215ee59c107d6c77','019085a76ba7126fff22770d71bd901c325fc68ac55aa743327984e89f4b0134','ce77d116a074dab7a22a0fd4f2c1ab475f16eec42e1ded3c0b0aa8211fe858d6','8dfe613b00d495fb8905bdf6e1317d3e3ac1f63a626032fa2bdad4750887ee8a','143632672dcb6ef324343739636b984f5c52ece0e078cfee7c6cac4a3545403a','cc870c07eeb672ab33b6c2be51b173ad5564af5d98bfc02da02367a9e349a76f','d0d626deb3f9484e649294a8dfa814c5568f846d5aa02d4cdad5d041a29d5600','c15abaf51e78ca56c0376522d699c978217bf041a3bd3c71d09193efa5717c71','019085a76ba7126fff22770d71bd901c325fc68ac55aa743327984e89f4b0134','e77d116a074dab7a22a0fd4f2c1ab475f16eec42e1ded3c0b0aa8211fe858d6','ac1b2b89e60707a20e9eb1ca480bc3410ead40643b386d624c5d21b47c02917c','c09040d35630d75dfef0f804f320f8b3d16a481071076918e9b236a321c1ea77','dab758bf98d9b36fa057a66cd0284737abf89857b73ca89280267ee7caf62f3b','eb6fab5a2964c5817fb239a7a5079cabca0a00464fb3e07155f28b0a57a2c0ed','32519b85c0b422e4656de6e6c41878e95fd95026267daab4215ee59c107d6c77','a25cadd48d70f6ea0c4a241d99c5241269e6faccb4054e62d16784640f8e53bc','d3c6785e18fba3749fb785bc313cf8346182f532c59172b69adfb31b96a5d0af'
+                    If ($SWHash){Write-Host "Detected Solarwinds hash match: " $SWHash} else {Write-Host "No Solarwinds matches found"}
+                }
+                catch {
+                    Write-Error "Failed to get hash data."
+                }
+            CloudWatchOutputConfig:
+              CloudWatchLogGroupName: /aws/ssm/AWS-RunPowerShellScript
+              CloudWatchOutputEnabled: true
+            OutputS3BucketName: dh-code
+            OutputS3KeyPrefix: test
+          description: 'Create hashes of specific Solarwinds .dll files, compare to know malicious hashes and report.  Get-Hash defaults to SHA256, so we match on SHA256 hashes'
+      DocumentType: Automation
+      Name: SolorWindsAA20-352AAutomatedScanner
+
+
+  AthenaNamedQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref FlowLogsDatabase
+      Description: "Using the data from CISA AA20-352A Appendix B to scan VPC Flow logs"
+      Name: "AA20352A IP IOC"
+      QueryString: !Sub >
+            SELECT *
+            FROM ${FlowLogsIOC}
+            WHERE destinationaddress in ('3.87.182.149','3.16.81.254','54.215.192.52','8.18.144.11','8.18.144.12','8.18.144.9','8.18.144.20','8.18.144.40','8.18.144.44','8.18.144.62','8.18.144.130','8.18.144.135','8.18.144.136','8.18.144.149','8.18.144.156','8.18.144.158','8.18.144.165','8.18.144.170','8.18.144.180','8.18.144.188','8.18.145.3','8.18.145.21','8.18.145.33','8.18.145.36','8.18.145.131','8.18.145.134','8.18.145.136','8.18.145.139','8.18.145.150','8.18.145.157','8.18.145.181','13.57.184.217','18.217.225.111','18.220.219.143','20.141.48.154','34.219.234.134','184.72.1.3','184.72.21.54','184.72.48.22','184.72.101.22','184.72.113.55','184.72.145.34','184.72.209.33','184.72.212.52','184.72.224.3','184.72.229.1','184.72.240.3','184.72.245.1','196.203.11.89','13.59.205.66','54.193.127.66') OR sourceaddress in ('3.87.182.149', '3.16.81.254','54.215.192.52','8.18.144.11','8.18.144.12','8.18.144.9','8.18.144.20','8.18.144.40','8.18.144.44','8.18.144.62','8.18.144.130','8.18.144.135','8.18.144.136','8.18.144.149','8.18.144.156','8.18.144.158','8.18.144.165','8.18.144.170','8.18.144.180','8.18.144.188','8.18.145.3','8.18.145.21','8.18.145.33','8.18.145.36','8.18.145.131','8.18.145.134','8.18.145.136','8.18.145.139','8.18.145.150','8.18.145.157','8.18.145.181','13.57.184.217','18.217.225.111','18.220.219.143','20.141.48.154','34.219.234.134','184.72.1.3','184.72.21.54','184.72.48.22','184.72.101.22','184.72.113.55','184.72.145.34','184.72.209.33','184.72.212.52','184.72.224.3','184.72.229.1','184.72.240.3','184.72.245.1','196.203.11.89','13.59.205.66','54.193.127.66')
+
+  AthenaDNSQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref DNSLogsDatabase
+      Description: "Using the data from CISA AA20-352A Appendix B to scan R53 DNS logs"
+      Name: "AA20352A DNS IOC"
+      QueryString: !Sub >
+        SELECT *
+        FROM ${DNSLogsIOC}
+        WHERE query_name IN ('deftsecurity.com.','avsvmcloud.com.','digitalcollege.org.','freescanonline.com.','globalnetworkissues.com.','kubecloud.com.','lcomputers.com.','seobundlekit.com.','solartrackingsystem.net.','thedoccloud.com.','virtualwebdata.com.','webcodez.com.')
