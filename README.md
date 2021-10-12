@@ -92,7 +92,10 @@ When enabled, this module will deploy separate functions that can help customers
   + Checks for EC2 instances that can not be managed with SSM
   + Checks for Stale IAM roles that have been granted S3 access but have not used them in the last 60 days
   + Checks for S3 deny public access enablement
-
+  + Checks to see if DNSSEC is enabled for public hosted zones in Amazon Route 53
+  + Checks to see if logging is enabled for services relevant to ransomware (i.e. CloudFront, Lambda, Route53 Query Logging, and Route 53 Resolver Logging).
+  + Checks to see if Route 53 Resolver DNS Firewall is enabled across all relevant regions
+  + Checks to see if there are any Access Keys that have not been used in last 90 days
 ## Overview - Optional SolarWinds module
   When enabled, this module will deploy separate functions that can help customers with evaluating their environment for SolarWinds vulnerability.  The checks are based on [CISA Alert AA20-352A](https://us-cert.cisa.gov/ncas/alerts/aa20-352a) from Appendix A & B.    
 
@@ -105,8 +108,8 @@ When enabled, this module will deploy separate functions that can help customers
   + This Athena query will scan your VPC flow logs for IP addresses from the CISA AA20-352A.
 + SSM Automation document - SolorWindsAA20-352AAutomatedScanner
   + This is a systems manager automation document that will scan Windows EC2 instances for impacted .dll files from CISA AA20-352A.
-+ Route53 DNS resolver query
-  + This will create a query for customers that have enabled [DNS query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/query-logs.html)
++ Route53 DNS resolver query - AA20352A DNS IOC
+  + This Athena query will scan your DNS logs for customers that have enabled [DNS query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/query-logs.html)
 
 
 # Frequently Asked Questions (FAQ)

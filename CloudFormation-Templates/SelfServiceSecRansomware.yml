@@ -12,6 +12,19 @@ Conditions:
 # Currently two features are not supported in GovCloud so we omit these two checks below with this partition check.
 
 Resources:
+  libs:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: boto3
+      Description: Dependencies for the ransomware modules
+      Content: 
+        S3Bucket: !Ref TemplatesS3Bucket
+        S3Key: "modules/RansomwareDetection/boto3_layer.zip"
+      CompatibleRuntimes:
+        - python3.9
+        - python3.8
+        - python3.7
+
   # rSSMRansomwareScanner:
   #   Type: "AWS::SSM::Document"
   #   Properties:
@@ -35,7 +48,110 @@ Resources:
   #         outputs:
   #           - configureServer.Output
   #     DocumentType: "Command"
+  rLambdaCheckForLogging:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: !Ref TemplatesS3Bucket
+        S3Key: "modules/RansomwareDetection/check_logging.py.zip"
+      FunctionName: "LambdaCheckForLogging"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 256
+      Layers:
+        - !Ref libs
+      Role: !Ref InstanceRoleARN
+      Runtime: "python3.8"
+      Timeout: 900
+      DeadLetterConfig: !Ref "AWS::NoValue"
+      TracingConfig:
+        Mode: "PassThrough"
+      Environment:
+        Variables:
+          reportbucket: !Ref SelfServiceSecS3Bucket
 
+  xLambdaCheckForLogging:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt rLambdaCheckForLogging.Arn
+
+  rLambdaCheckForRoute53DNSFirewall:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: !Ref TemplatesS3Bucket
+        S3Key: "modules/RansomwareDetection/check_route53_dns_firewall.py.zip"
+      FunctionName: "LambdaCheckForRoute53DNSFirewall"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 128
+      Layers:
+        - !Ref libs
+      Role: !Ref InstanceRoleARN
+      Runtime: "python3.8"
+      Timeout: 600
+      DeadLetterConfig: !Ref "AWS::NoValue"
+      TracingConfig:
+        Mode: "PassThrough"
+      Environment:
+        Variables:
+          reportbucket: !Ref SelfServiceSecS3Bucket
+
+  xLambdaCheckForRoute53DNSFirewall:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt rLambdaCheckForRoute53DNSFirewall.Arn
+  
+  rLambdaCheckForUnusedAccessKeys:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: !Ref TemplatesS3Bucket
+        S3Key: "modules/RansomwareDetection/check_unused_access_keys.py.zip"
+      FunctionName: "LambdaCheckForUnusedAccessKeys"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 128
+      Role: !Ref InstanceRoleARN
+      Runtime: "python3.8"
+      Timeout: 600
+      DeadLetterConfig: !Ref "AWS::NoValue"
+      TracingConfig:
+        Mode: "PassThrough"
+      Environment:
+        Variables:
+          reportbucket: !Ref SelfServiceSecS3Bucket
+
+  xLambdaCheckForUnusedAccessKeys:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt rLambdaCheckForUnusedAccessKeys.Arn
+
+#
+  rLambdaCheckForDNSSEC:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: !Ref TemplatesS3Bucket
+        S3Key: "modules/RansomwareDetection/check_dnssec.py.zip"
+      FunctionName: "LambdaCheckForDNSSEC"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 128
+      Layers:
+        - !Ref libs
+      Role: !Ref InstanceRoleARN
+      Runtime: "python3.8"
+      Timeout: 600
+      DeadLetterConfig: !Ref "AWS::NoValue"
+      TracingConfig:
+        Mode: "PassThrough"
+      Environment:
+        Variables:
+          reportbucket: !Ref SelfServiceSecS3Bucket
+
+  xLambdaCheckForDNSSEC:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt rLambdaCheckForDNSSEC.Arn
+
+#
   rLambdaCheckFor2k8:
     Type: "AWS::Lambda::Function"
     Properties:
@@ -183,7 +299,7 @@ Resources:
     Condition: CreateGovCloudResources
     Properties:
       ServiceToken: !GetAtt rLambdaCheckForSSMUse.Arn
-
+#///////
   # rLambdaSSMScanner:
   #   Type: "AWS::Lambda::Function"
   #   Properties:

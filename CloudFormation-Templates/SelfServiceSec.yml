@@ -14,6 +14,7 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+
 Conditions:
 # This will enable the optional ransomware specific modules
   EnableRansomwareChecks: !Equals
@@ -102,6 +103,7 @@ Resources:
         SelfServiceSecS3Bucket: !GetAtt
             - rS3Stack
             - Outputs.SelfServiceSecS3Bucket
+
 Outputs:
   ReportBucketName:
     Description: The name of the newly generated S3 Bucket with reports from the tool

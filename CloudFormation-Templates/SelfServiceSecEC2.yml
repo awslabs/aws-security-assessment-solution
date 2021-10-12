@@ -45,8 +45,8 @@ Resources:
           git clone https://github.com/nccgroup/ScoutSuite.git
           cd prowler
           aws configure set default.region ${AWS::Region}
-          ./prowler -q -M html,csv
-          aws s3 cp ./output s3://${SelfServiceSecS3Bucket} --recursive --include "prowler-output*"
+          ./prowler -q | tee prowler-output.txt
+          aws s3 cp prowler-output.txt s3://${SelfServiceSecS3Bucket}
           cd /root/ScoutSuite/
           pip install virtualenv
           virtualenv -p python3 venv
