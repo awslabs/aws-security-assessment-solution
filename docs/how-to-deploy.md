@@ -78,10 +78,12 @@ Enter a unique stack name
 * This is just the name of the new bucket where you have placed the files from "CloudFormation-Templates".  
    ` Note` - This is ONLY the **bucket name** (e.g. your-bucket-name) not the full S3 bucket URL
 
+### Enable checks for common security mistakes module
+* This will deploy several additional checks that will check for common security mistakes as highlighted in https://www.youtube.com/watch?v=tmuClE3nWlk   
+`Note` - We may be adding more checks to this over time
 ### Enable ransomeware detection modules
 * This will deploy several additional functions that can help you scan your environment for ransomware   
-  `Note` - We will be adding more modules to this over time
-
+`Note` - We may be adding more modules to this over time
 
 ## 2. Tagging and Role for CloudFormation
 

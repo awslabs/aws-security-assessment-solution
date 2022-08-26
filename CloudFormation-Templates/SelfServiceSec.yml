@@ -14,11 +14,24 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+  
+  CommonSecurityMistakesChecks:
+    Description: "Check for common security mistakes as per https://www.youtube.com/watch?v=tmuClE3nWlk "
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
 
 Conditions:
 # This will enable the optional ransomware specific modules
   EnableRansomwareChecks: !Equals
     - !Ref RansomwareChecks
+    - 'true'
+
+# This will enable the optional common security mistake checks specific modules
+  EnableCommonSecurityMistakesChecks: !Equals
+    - !Ref CommonSecurityMistakesChecks
     - 'true'
 
 Resources:
@@ -95,6 +108,27 @@ Resources:
           - '.s3.'
           - !Ref "AWS::Region"
           - '.amazonaws.com/SelfServiceSecRansomware.yml'
+      Parameters:
+        InstanceRoleARN: !GetAtt
+          - rIAMStack
+          - Outputs.InstanceRoleARN
+        TemplatesS3Bucket: !Ref TemplateS3Bucket
+        SelfServiceSecS3Bucket: !GetAtt
+            - rS3Stack
+            - Outputs.SelfServiceSecS3Bucket
+  
+  #This will enable the optional checks for common security mistakes
+  rCommonSecurityMistakesChecks:
+    Condition: EnableCommonSecurityMistakesChecks
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - 'https://'
+          - !Ref TemplateS3Bucket
+          - '.s3.'
+          - !Ref "AWS::Region"
+          - '.amazonaws.com/SelfServiceSecCommonSecurityMistakes.yml'
       Parameters:
         InstanceRoleARN: !GetAtt
           - rIAMStack

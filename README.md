@@ -76,13 +76,29 @@ The first assessment is from [Prowler](https://github.com/toniblyx/prowler).
 The second assessment is from [ScoutSuite](https://github.com/nccgroup/ScoutSuite)
 + ScoutSuite has been around since 2012, originally a Scout, then Scout2, and now ScoutSuite. This will provide a set of files that can be viewed in your browser and conducts a wide range of checks
 
-## Overview - Optional Ransomware modules
+## Overiew of optional modules
+### &#9658; Check for Common Security Mistakes module
+When enabled, this module will deploy a lambda function that checks for common security mistakes highlighted in  https://www.youtube.com/watch?v=tmuClE3nWlk.  
+
+#### What will be created
+
+A Lambda function that will perform the checks. Some of the checks include:
++ GuardDuty set to alert on findings
++ GuardDuty enabled across all regions
++ Prevent accidental key deletion
++ Existence of a Multi-region CloudTrail
++ CloudTrail validation enabled
++ No local IAM users
++ Roles tuned for least privilege in last 90 days
++ Alerting for root account use
++ Alerting for local IAM user create/delete
++ Use of Managed Prefix Lists in Security Groups
++ Public S3 Buckets
+### &#9658; Ransomware modules
 When enabled, this module will deploy separate functions that can help customers with evaluating their environment for ransomware infection and susceptibility to ransomware damage.
 
-### What will be created
+#### What will be created
 
-+ AmazonLinux SSM scanner Lambda function
-  + This Lambda function will illustrate how you can use SSM to scan an EC2 instance for file extensions that are associated with ransomeware infection.
 + AWS Core security services enabled
   + Checks for AWS security service enablement in all regions where applicable (GuardDuty, SecurityHub)
 + Data protection checks
@@ -96,14 +112,14 @@ When enabled, this module will deploy separate functions that can help customers
   + Checks to see if logging is enabled for services relevant to ransomware (i.e. CloudFront, Lambda, Route53 Query Logging, and Route 53 Resolver Logging).
   + Checks to see if Route 53 Resolver DNS Firewall is enabled across all relevant regions
   + Checks to see if there are any Access Keys that have not been used in last 90 days
-## Overview - Optional SolarWinds module
+### &#9658; SolarWinds module
   When enabled, this module will deploy separate functions that can help customers with evaluating their environment for SolarWinds vulnerability.  The checks are based on [CISA Alert AA20-352A](https://us-cert.cisa.gov/ncas/alerts/aa20-352a) from Appendix A & B.    
 
   `Note`: Prior to enablement of this module, please read the module [documentation](CloudFormation-Templates/modules/SolarWindsChecks/README.md) which reviews the steps that need to be completed prior to using this module.
 
   `Note`: This module **MUST** be run separately as its own stack, select the S3 URL SelfServiceSecSolar.yml to deploy
 
-### What will be created
+#### What will be created
 + Athena query - AA20352A IP IOC
   + This Athena query will scan your VPC flow logs for IP addresses from the CISA AA20-352A.
 + SSM Automation document - SolorWindsAA20-352AAutomatedScanner
