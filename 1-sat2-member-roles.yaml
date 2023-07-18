@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploys the roles needed for Prowler to run in each account.
+Parameters:
+  ProwlerAccountID:
+    Description: 'Specifies the account ID where Prowler will run from.'
+    Type: String
+    Default: '012345678910'
+    AllowedPattern: \d{12}
+    ConstraintDescription: Enter the 12 digit account ID with no spaces.
+
+Resources:
+  ProwlerIntegrationCodeBuildRole:
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: Role allows * in resource policy. The role needs broad, read-only privileges to review all resources. Only the CodeBuild role created as part of this solution can assume this role.
+          - id: W28
+            reason: Resource has an explicit name so Prowler can loop through and assume it in each account.
+          - id: W76
+            reason: SPCM for IAM policy is higher than 25 due to managed polices, and additional polices. Each section of the role has a comment with the Prowler documentation describing the need for the privileges. 
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: '/service-role/'
+      RoleName: ProwlerMemberRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${ProwlerAccountID}:root' 
+            Action:
+              - 'sts:AssumeRole'
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${ProwlerAccountID}:role/service-role/ProwlerCodeBuildRole
+      ManagedPolicyArns:
+      # Prowler requires these managed polices to perform all the checks
+      # https://docs.prowler.cloud/en/latest/getting-started/requirements/
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/SecurityAudit'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess'
+      Policies:
+      # Prowler requires these additional read-only permissions. They are documented in the Prowler documentation.
+      # https://github.com/prowler-cloud/prowler/blob/master/permissions/prowler-additions-policy.json
+        - PolicyName: ProwlerAdditions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - account:Get*
+                - appstream:Describe*
+                - appstream:List*
+                - backup:List*
+                - cloudtrail:GetInsightSelectors
+                - codeartifact:List*
+                - codebuild:BatchGet*
+                - drs:Describe*
+                - ds:Get*
+                - ds:Describe*
+                - ds:List*
+                - ec2:GetEbsEncryptionByDefault
+                - ecr:Describe*
+                - ecr:GetRegistryScanningConfiguration
+                - elasticfilesystem:DescribeBackupPolicy
+                - glue:GetConnections
+                - glue:GetSecurityConfiguration*
+                - glue:SearchTables
+                - lambda:GetFunction*
+                - logs:FilterLogEvents
+                - macie2:GetMacieSession
+                - s3:GetAccountPublicAccessBlock
+                - shield:DescribeProtection
+                - shield:GetSubscriptionState
+                - securityhub:BatchImportFindings
+                - securityhub:GetFindings
+                - ssm:GetDocument
+                - ssm-incidents:List*
+                - support:Describe*
+                - tag:GetTagKeys
+                - wellarchitected:List*
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                - apigateway:GET
+                Effect: Allow
+                Resource:
+                - !Sub arn:${AWS::Partition}:apigateway:*::/restapis/*
+                - !Sub arn:${AWS::Partition}:apigateway:*::/apis/*
