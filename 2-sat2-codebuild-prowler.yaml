@@ -432,6 +432,7 @@ Resources:
     Condition: CreateEmailNotification
     Type: AWS::SNS::Topic
     Properties:
+      KmsMasterKeyId: alias/aws/sns
       Subscription: 
         - Endpoint: !Ref EmailAddress
           Protocol: email
