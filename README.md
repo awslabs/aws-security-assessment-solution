@@ -262,7 +262,7 @@ These instructions assume you already have the prerequisites for stack set opera
 </details>
 
 ## Review the results
-After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete.
+After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv file in the /reporting folder.
 
 If you didn't configure email alerts, you can monitor the progress from the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects).
 
@@ -290,9 +290,14 @@ To review the results, follow these steps.
 
 By default, SAT2 will run a basic scan which includes 13 checks. You can choose to run an intermediate or full check by choosing a different ProwlerScanType parameter value.
 
-For example
+For example, a single account scan using the intermediate scan option would use this command:
 
-`aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml --stack-name sat2-prowler --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProwlerScanType=Intermediate`
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ProwlerScanType=Intermediate
+```
 
 ### Basic Scan
 
@@ -334,7 +339,12 @@ This may be helpful when running longer scans, or across many accounts.
 
 For example, a single account scan with email notifications would use this command:
 
-`aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml --stack-name sat2 --capabilities CAPABILITY_NAMED_IAM --parameter-overrides EmailAddress=email@domain.com`
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides EmailAddress=email@domain.com
+```
 
 With or without the optional EmailAddress parameter set, you can view the progress in the CodeBuild console.
 1. Navigate to the [CodeSuite console](https://console.aws.amazon.com/codesuite/).
@@ -348,6 +358,23 @@ With or without the optional EmailAddress parameter set, you can view the progre
     ![CodeBuild project](/img/codebuild-project.png)
 
 5. Optionally, you can choose **Start build** to run another scan with the options you choose when you deployed the solution.
+
+## Reporting Summary
+
+You can optionally enable reporting to summarize multiple Prowler scan csv files into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reporting folder.
+
+If you specify an email address while reporting is enabled, you will get a second email when the Athena query is finished. 
+
+For example, a multi-account scan with reporting and email alerts enabled would use this command:
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides MultiAccountScan=true Reporting=true EmailAddress=email@domain.com
+```
+
+![reporting architecture diagram](img/reporting.png)
 
 ## Frequently Asked Questions (FAQ)
 
