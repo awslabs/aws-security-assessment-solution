@@ -32,6 +32,13 @@ Parameters:
     Description: 'Specify an address if you want to receive an email when the scan completes.'
     Type: String
     Default: ''
+  Reporting:
+    Description: 'Set this to true if you want to summarize the Prowler reports using Amazon Athena. This is helpful when scanning multiple accounts.'
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
   
 Conditions:
   CreateProwlerRole: !Equals
@@ -39,6 +46,10 @@ Conditions:
     - false
 
   CreateEmailNotification: !Not [!Equals [!Ref EmailAddress, '']]
+
+  EnableReporting: !Equals 
+    - !Ref Reporting
+    - true
 
 Mappings:
   ProwlerScanParameters:
@@ -250,7 +261,7 @@ Resources:
 
           def lambda_handler(event,context):
             print(event)
-            if event['RequestType'] == ('Create' or 'Update'):
+            if event['RequestType'] == 'Create':
               startBuild(event, context)
             else:
               no_op(event,context)
@@ -371,6 +382,10 @@ Resources:
             build:
               commands:
                 - |
+                  if [[ $AWS_REGION =~ 'gov' ]]; then
+                      STS_ENDPOINT='--sts-endpoint-region us-gov-west-1'
+                  fi
+
                   if [[ $MULTI_ACCOUNT_SCAN = 'true' ]]; then
 
                       echo "Running multi-account scan."
@@ -390,16 +405,16 @@ Resources:
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
-                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE"
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE
+                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE $STS_ENDPOINT"
+                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE $STS_ENDPOINT
                           } &
                       done
 
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
                       echo "Running a single account scan."
-                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE"
-                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE
+                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE $STS_ENDPOINT"
+                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE $STS_ENDPOINT
 
                   fi
 
@@ -407,7 +422,11 @@ Resources:
             post_build:
               commands:
                 - echo "Uploading reports to S3..."
-                - aws s3 cp --sse AES256 output/ s3://$BUCKET_REPORT/$(date +%Y%m%d_%H%M%S) --recursive
+                - aws s3 cp --exclude "*" --include "*.csv" output/ s3://$BUCKET_REPORT/csv/ --recursive
+                - aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/ --recursive
+                - aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/ --recursive
+                - aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/ --recursive
+                - aws s3 cp --exclude "*" --include "*.asff.json" output/ s3://$BUCKET_REPORT/asff-json/ --recursive
                 - echo "Done!"
 
   ProwlerLogGroup:
@@ -432,7 +451,6 @@ Resources:
     Condition: CreateEmailNotification
     Type: AWS::SNS::Topic
     Properties:
-      KmsMasterKeyId: alias/aws/sns
       Subscription: 
         - Endpoint: !Ref EmailAddress
           Protocol: email
@@ -484,6 +502,296 @@ Resources:
               "The Prowler scan has <build-status>."
 
               "You can view your results in the <bucket> bucket."
+
+  GlueDatabaseSATv2Findings:
+    Condition: EnableReporting
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref ProwlerFindingsBucket
+        Description: !Sub "SATv2 assessment results in the ${ProwlerFindingsBucket}"
+
+  GlueTableProwlerResults:
+    Condition: EnableReporting
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseSATv2Findings
+      TableInput:
+        Name: "prowler"
+        Description: "Results of the Prowler scan from SATv2"
+        TableType: EXTERNAL_TABLE
+        Parameters: {
+            "skip.header.line.count": "1",
+            "classification": "csv",
+          }    
+        StorageDescriptor:
+          Columns:
+          - Name: assessment_start_time
+            Type: string
+          - Name: finding_unique_id
+            Type: string
+          - Name: provider
+            Type: string
+          - Name: check_id
+            Type: string
+          - Name: check_title
+            Type: string
+          - Name: check_type
+            Type: string
+          - Name: status
+            Type: string
+          - Name: status_extended
+            Type: string
+          - Name: service_name
+            Type: string
+          - Name: subservice_name
+            Type: string
+          - Name: severity
+            Type: string
+          - Name: resource_type
+            Type: string
+          - Name: resource_details
+            Type: string
+          - Name: resource_tags
+            Type: string
+          - Name: description
+            Type: string
+          - Name: risk
+            Type: string
+          - Name: related_url
+            Type: string
+          - Name: remediation_recommendation_text
+            Type: string
+          - Name: remediation_recommendation_url
+            Type: string
+          - Name: remediation_recommendation_code_nativeiac
+            Type: string
+          - Name: remediation_recommendation_code_terraform
+            Type: string
+          - Name: remediation_recommendation_code_cli
+            Type: string
+          - Name: remediation_recommendation_code_other
+            Type: string
+          - Name: compliance
+            Type: string
+          - Name: categories
+            Type: string
+          - Name: depends_on
+            Type: string
+          - Name: related_to
+            Type: string
+          - Name: notes
+            Type: string
+          - Name: profile
+            Type: string
+          - Name: account_id
+            Type: string
+          - Name: account_name
+            Type: string
+          - Name: account_email
+            Type: string
+          - Name: account_arn
+            Type: string
+          - Name: account_org
+            Type: string
+          - Name: account_tags
+            Type: string
+          - Name: region
+            Type: string
+          - Name: resource_id
+            Type: string
+          - Name: resource_arn
+            Type: string
+          Location: !Sub s3://${ProwlerFindingsBucket}/csv
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: False
+          StoredAsSubDirectories: False
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
+            Parameters: {
+              "escapeChar": "\\",
+              "quoteChar": "\"",
+              "separatorChar": ";"
+            }
+        Retention: 0
+
+  SATv2Reporting:
+    Condition: EnableReporting
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Ref GlueDatabaseSATv2Findings
+      RecursiveDeleteOption: True
+      State: ENABLED
+      WorkGroupConfiguration:
+        PublishCloudWatchMetricsEnabled: false
+        RequesterPaysEnabled: false
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${ProwlerFindingsBucket}/reports
+
+  AthenaStartQueryLambdaRole:
+    Condition: EnableReporting
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AccessToAthena
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'athena:StartQueryExecution'
+                Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${SATv2Reporting}
+              - Effect: Allow
+                Action:
+                 - s3:GetBucketLocation
+                 - s3:GetObject
+                 - s3:ListBucket
+                 - s3:ListBucketMultipartUploads
+                 - s3:AbortMultipartUpload
+                 - s3:PutObject
+                 - s3:ListMultipartUploadPart
+                Resource: 
+                 - !GetAtt ProwlerFindingsBucket.Arn
+                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - 'glue:GetTable'
+                Resource:
+                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}
+                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseSATv2Findings}/${GlueTableProwlerResults}
+
+  AthenaStartQueryLogGroup:
+    Condition: EnableReporting
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: CloudWatch Logs protects data at rest using encryption. All log groups are encrypted. By default, the CloudWatch Logs service manages the server-side encryption keys.
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AthenaStartQueryLambda}'
+      RetentionInDays: 7      
+
+  AthenaStartQueryLambda:
+    Condition: EnableReporting
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: The AthenaStartQueryLambdaRole gives Lambda access to write CloudWatch logs.
+          - id: W89
+            reason: Lambda is not deployed inside of a VPC. The Lambda function is used to start the CodeBuild job as a custom CloudFormation resource.
+          - id: W92
+            reason: Reserved concurrent executions is not set.
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Sub ${AthenaStartQueryLambdaRole.Arn}
+      Timeout: 120
+      Environment:
+        Variables:
+          ATHENA_WORKGROUP: !Ref SATv2Reporting
+          BUCKET_REPORT: !Ref ProwlerFindingsBucket
+      Runtime: python3.10
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+          from botocore.exceptions import ClientError
+
+          S3_BUCKET = os.environ['BUCKET_REPORT']
+          WORKGROUP = os.environ['ATHENA_WORKGROUP']
+                  
+          def startQuery(event, context):
+              responseData = {}
+              athena = boto3.client('athena')
+              try:
+                print("Starting query...")
+                response = athena.start_query_execution(
+                    QueryString="""SELECT * FROM \"AwsDataCatalog\".\"{}\".\"prowler\"""".format(S3_BUCKET),
+                    WorkGroup=WORKGROUP
+                    )
+                print(response)
+              except ClientError as e:
+                print("Failed to start query")
+                print(e)
+
+          def lambda_handler(event,context):
+              print(event)
+              startQuery(event, context)
+
+  AthenaStartQueryLambdaInvokePermission:
+    Condition: EnableReporting
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AthenaStartQueryLambda.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt CodeBuildCompleteRunSummary.Arn
+
+  CodeBuildCompleteRunSummary:
+    Condition: EnableReporting
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.codebuild
+        detail-type:
+          - CodeBuild Build State Change
+        detail:
+          build-status:
+            - SUCCEEDED
+          project-name:
+            - !Ref ProwlerCodeBuild
+      State: ENABLED
+      Targets:
+        - Id: AthenaStartQueryLambda
+          Arn: !GetAtt AthenaStartQueryLambda.Arn
+
+  AthenaSummaryQueryStateChangeRule:
+    Condition: CreateEmailNotification
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.athena
+        detail-type:
+          - Athena Query State Change
+        detail:
+          currentState:
+            - SUCCEEDED
+            - FAILED
+          workgroupName:
+            - !Ref ProwlerFindingsBucket
+      State: ENABLED
+      Targets:
+        - Id: toSNS
+          Arn: !Ref ProwlerScanNotificationTopic
+          InputTransformer:
+            InputPathsMap:
+              status: $.detail.currentState
+            InputTemplate: !Sub >-
+              "The query to summarize reporting has <status>."
+
+              "You can view your results in the ${ProwlerFindingsBucket}/reporting bucket."
 
 Outputs:
   AccountID: 
