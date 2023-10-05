@@ -376,6 +376,19 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 
 ![reporting architecture diagram](img/reporting.png)
 
+A saved query is created as an example. This query counts the checks that failed across all the accounts assessed. To review and run the query, follow these steps:
+
+1. Navigate to the Amazon Athena console.
+2. Choose the workgroup that begins with sat2-prowler-*.
+3. Choose the **Saved queries** tab.
+4. Select the query you want to run by choosing the **ID**.
+   
+    ![Athena saved query](/img/athena-query.png)
+
+5. Choose **Run** to run the query.
+
+    ![Athena saved query results](/img/athena-query-results.png)
+
 ## Frequently Asked Questions (FAQ)
 
 1.	Is there a cost?

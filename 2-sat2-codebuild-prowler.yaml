@@ -631,6 +631,28 @@ Resources:
         ResultConfiguration:
           OutputLocation: !Sub s3://${ProwlerFindingsBucket}/reports
 
+  qProwlerOrgSummary:
+    Condition: EnableReporting
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref GlueDatabaseSATv2Findings
+      Description: "Count the number of recommendations across all assessed accounts"
+      Name: "Prowler organization summary"
+      QueryString: !Sub |
+        -- Count the number of recommendations across all assessed accounts.
+          SELECT 
+              check_id, 
+              count(*) as count
+          FROM 
+              "${GlueDatabaseSATv2Findings}"."prowler"
+          WHERE 
+              status = 'FAIL'
+          GROUP BY 
+              check_id
+          ORDER BY 
+              count desc
+      WorkGroup: !Ref SATv2Reporting
+
   AthenaStartQueryLambdaRole:
     Condition: EnableReporting
     Type: 'AWS::IAM::Role'
