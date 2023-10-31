@@ -64,11 +64,12 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
 3. In the navigation pane, choose **Stacks**.
 4. Choose **Create stack**.
 5. Under Specify template, select **Upload a template file**.
-6. Choose **Next**.
-7. For Stack name, enter **sat2**.
-8. Choose **Next**.
-9.  On the Configure stack options page, choose **Next**. 
-10. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
+6. Choose **2-sat2-codebuild-prowler.yaml** you downloaded in step 1.
+7. Choose **Next**.
+8. For Stack name, enter **sat2**.
+9. Choose **Next**.
+10. On the Configure stack options page, choose **Next**. 
+11. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
 
 </details>
 
@@ -248,16 +249,18 @@ These instructions assume you already have the prerequisites for stack set opera
 3. Choose **Create stack**.
    
 4. Under Specify template, select **Upload a template file**.
+
+5. Choose **2-sat2-codebuild-prowler.yaml** you downloaded in step 1-1. 
    
-5. Choose **Next**.
+6. Choose **Next**.
    
-6. For Stack name, enter **sat2-prowler**.
+7. For Stack name, enter **sat2-prowler**.
    
-7. Choose **Next**.
+8. Choose **Next**.
    
-8.  On the Configure stack options page, choose **Next**. 
+9.  On the Configure stack options page, choose **Next**. 
    
-9.  On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
+10. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
 
 </details>
 
