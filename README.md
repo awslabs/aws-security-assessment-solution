@@ -256,11 +256,15 @@ These instructions assume you already have the prerequisites for stack set opera
    
 7. For Stack name, enter **sat2-prowler**.
    
-8. Choose **Next**.
+8. In the Parameters section, for **MultiAccountScan**, select **true**. 
    
-9.  On the Configure stack options page, choose **Next**. 
+9.  You can optionally enable reporting to get a summary of all accounts in a single csv file. For **Reporting**, select **true**.
    
-10. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
+10. Choose **Next**.
+   
+11. On the Configure stack options page, choose **Next**. 
+   
+12. On the Review SAS page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
 
 </details>
 
