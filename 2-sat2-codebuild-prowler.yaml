@@ -377,7 +377,7 @@ Resources:
                 python: 3.11
               commands:
                 - echo "Installing Prowler and dependencies..."
-                - pip3 install prowler
+                - pip3 install 'prowler<4.0'
                 - prowler -v
             build:
               commands:
