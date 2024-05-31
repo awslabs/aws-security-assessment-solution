@@ -377,7 +377,7 @@ Resources:
                 python: 3.11
               commands:
                 - echo "Installing Prowler and dependencies..."
-                - pip3 install 'prowler<4.0'
+                - pip3 install prowler
                 - prowler -v
             build:
               commands:
@@ -528,82 +528,88 @@ Resources:
           }    
         StorageDescriptor:
           Columns:
-          - Name: assessment_start_time
-            Type: string
-          - Name: finding_unique_id
-            Type: string
-          - Name: provider
-            Type: string
-          - Name: check_id
-            Type: string
-          - Name: check_title
-            Type: string
-          - Name: check_type
-            Type: string
-          - Name: status
-            Type: string
-          - Name: status_extended
-            Type: string
-          - Name: service_name
-            Type: string
-          - Name: subservice_name
-            Type: string
-          - Name: severity
-            Type: string
-          - Name: resource_type
-            Type: string
-          - Name: resource_details
-            Type: string
-          - Name: resource_tags
-            Type: string
-          - Name: description
-            Type: string
-          - Name: risk
-            Type: string
-          - Name: related_url
-            Type: string
-          - Name: remediation_recommendation_text
-            Type: string
-          - Name: remediation_recommendation_url
-            Type: string
-          - Name: remediation_recommendation_code_nativeiac
-            Type: string
-          - Name: remediation_recommendation_code_terraform
-            Type: string
-          - Name: remediation_recommendation_code_cli
-            Type: string
-          - Name: remediation_recommendation_code_other
-            Type: string
-          - Name: compliance
-            Type: string
-          - Name: categories
-            Type: string
-          - Name: depends_on
-            Type: string
-          - Name: related_to
-            Type: string
-          - Name: notes
-            Type: string
-          - Name: profile
-            Type: string
-          - Name: account_id
-            Type: string
-          - Name: account_name
-            Type: string
-          - Name: account_email
-            Type: string
-          - Name: account_arn
-            Type: string
-          - Name: account_org
-            Type: string
-          - Name: account_tags
-            Type: string
-          - Name: region
-            Type: string
-          - Name: resource_id
-            Type: string
-          - Name: resource_arn
-            Type: string
+            - Name: auth_method
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: account_uid
+              Type: string
+            - Name: account_namse
+              Type: string
+            - Name: account_email
+              Type: string
+            - Name: account_organization_uid
+              Type: string
+            - Name: account_organization_name
+              Type: string
+            - Name: account_tags
+              Type: string
+            - Name: finding_uid
+              Type: string
+            - Name: provider
+              Type: string
+            - Name: check_id
+              Type: string
+            - Name: check_title
+              Type: string
+            - Name: check_type
+              Type: string
+            - Name: status
+              Type: string
+            - Name: status_extended
+              Type: string
+            - Name: muted
+              Type: boolean
+            - Name: service_name
+              Type: string
+            - Name: subservice_name
+              Type: string
+            - Name: severity
+              Type: string
+            - Name: resource_type
+              Type: string
+            - Name: resource_uid
+              Type: string
+            - Name: resource_name
+              Type: string
+            - Name: resource_details
+              Type: string
+            - Name: resource_tags
+              Type: string
+            - Name: partition
+              Type: string
+            - Name: region
+              Type: string
+            - Name: description
+              Type: string
+            - Name: risk
+              Type: string
+            - Name: related_url
+              Type: string
+            - Name: remediation_recommendation_text
+              Type: string
+            - Name: remediation_recommendation_url
+              Type: string
+            - Name: remediation_code_nativeiac
+              Type: string
+            - Name: remediation_code_terraform
+              Type: string
+            - Name: remediation_code_cli
+              Type: string
+            - Name: remediation_code_other
+              Type: string
+            - Name: compliance
+              Type: string
+            - Name: categories
+              Type: string
+            - Name: depends_on
+              Type: string
+            - Name: related_to
+              Type: string
+            - Name: notes
+              Type: string
+            - Name: prowler_version
+              Type: string
           Location: !Sub s3://${ProwlerFindingsBucket}/csv
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -617,6 +623,19 @@ Resources:
               "separatorChar": ";"
             }
         Retention: 0
+
+  LakeFormationPermissionsLambda:
+    Condition: EnableReporting
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Sub ${AthenaStartQueryLambdaRole.Arn}
+      Permissions: 
+        - SELECT
+      Resource:
+        TableResource:
+             DatabaseName: !Ref GlueDatabaseSATv2Findings
+             Name: !Ref GlueTableProwlerResults
 
   SATv2Reporting:
     Condition: EnableReporting
@@ -691,6 +710,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'glue:GetTable'
+                  - 'glue:GetDatabase'
                 Resource:
                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}

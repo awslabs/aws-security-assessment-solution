@@ -1,10 +1,38 @@
-## Self-Service Security Assessment Solutions (v2.0)
+## Self-Service Security Assessment Solutions (v2.0)<!-- omit from toc -->
 
 Cybersecurity remains a very important topic and point of concern for many CIOs, CISOs, and their customers. To meet these important concerns, AWS has developed a primary set of services customers should use to aid in protecting their accounts. [Amazon GuardDuty](https://aws.amazon.com/guardduty/), [AWS Security Hub](https://aws.amazon.com/security-hub/), [AWS Config](https://aws.amazon.com/config/), and [AWS Well-Architected](https://aws.amazon.com/architecture/well-architected/?wa-lens-whitepapers.sort-by=item.additionalFields.sortDate&wa-lens-whitepapers.sort-order=desc&wa-guidance-whitepapers.sort-by=item.additionalFields.sortDate&wa-guidance-whitepapers.sort-order=desc) reviews help customers maintain a strong security posture over their AWS accounts. As more organizations deploy to the cloud, especially if they are doing so quickly, and they have not yet implemented the recommended AWS Services, there may be a need to conduct a rapid security assessment of the cloud environment.
 
 We have developed an inexpensive, easy to deploy, secure, and fast solution to provide our customers with a security assessment report. These reports are generated using the open source project [Prowler](https://github.com/toniblyx/prowler). Prowler performs point in time security assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can follow the instructions in the [Prowler Documentation](https://docs.prowler.cloud/en/latest/tutorials/aws/securityhub/).
 
 >Note: Prowler is not an AWS owned solution. Customers should independently review Prowler before running this solution. Any dependencies associated with Prowler should be kept up to date. This solution installs the latest version available from pip package installer.
+
+## Table of Contents<!-- omit from toc -->
+- [Overview](#overview)
+- [Deployment](#deployment)
+- [Single account scan](#single-account-scan)
+  - [AWS CloudShell](#aws-cloudshell)
+    - [Deploy the solution](#deploy-the-solution)
+  - [AWS Console](#aws-console)
+    - [Deploy the solution](#deploy-the-solution-1)
+- [Multi-account scan](#multi-account-scan)
+  - [AWS CloudShell](#aws-cloudshell-1)
+    - [Step 1: Deploy prerequisite role](#step-1-deploy-prerequisite-role)
+    - [Step 2: Deploy the SATv2 solution](#step-2-deploy-the-satv2-solution)
+  - [AWS Console](#aws-console-1)
+    - [Step 1: Deploy prerequisite role](#step-1-deploy-prerequisite-role-1)
+    - [Step 2: Enable delegated administrator for AWS Organizations](#step-2-enable-delegated-administrator-for-aws-organizations)
+    - [Step 3: Deploy the SATv2 solution](#step-3-deploy-the-satv2-solution)
+- [Review the results](#review-the-results)
+- [Scan types](#scan-types)
+  - [Basic Scan](#basic-scan)
+  - [Intermediate scan](#intermediate-scan)
+  - [Full scan](#full-scan)
+- [Notifications](#notifications)
+- [Reporting Summary](#reporting-summary)
+- [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
+- [Clean Up](#clean-up)
+- [Security](#security)
+- [License](#license)
 
 ## Overview
 The solution is deployed with [AWS CloudFormation](https://aws.amazon.com/cloudformation/). When deployed, an [AWS CodeBuild](https://aws.amazon.com/codebuild/) project and an [Amazon S3](https://aws.amazon.com/s3/) bucket to store the Prowler generated reports are created. An [AWS Lambda](https://aws.amazon.com/lambda/) function is then used to start the AWS CodeBuild project. 
@@ -27,7 +55,7 @@ You can use this project to run Prowler across multiple accounts in an AWS Organ
 ## Single account scan
 To run the Self-Service Security Assessment solution (SATv2) against a single account, follow the instructions below. You can choose to use the AWS CLI or the AWS Console.
 
-#### AWS CloudShell
+### AWS CloudShell
 
 <details>
     <summary>Show steps</summary>
@@ -52,7 +80,7 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
 </details>
 
     
-#### AWS Console
+### AWS Console
 
 <details>
     <summary>Show steps</summary>
@@ -81,7 +109,7 @@ These instructions assume you already have the prerequisites for stack set opera
 
 >Note: StackSets don't apply to the management account. To assess the management account, deploy the 1-sat2-member-role as a CloudFormation Stack.
 
-#### AWS CloudShell
+### AWS CloudShell
 
 <details>
     <summary>Show steps</summary>
@@ -194,7 +222,7 @@ These instructions assume you already have the prerequisites for stack set opera
 
 </details>
 
-#### AWS Console
+### AWS Console
 
 <details>
     <summary>Show steps</summary>
@@ -240,7 +268,31 @@ These instructions assume you already have the prerequisites for stack set opera
     
 16. On the **Review** page, select the box **I acknowledge that AWS CloudFormation might create IAM resources.** and choose **Submit**.
 
-#### Step 2: Deploy the SATv2 solution
+#### Step 2: Enable delegated administrator for AWS Organizations
+Determine if you have delegated administrator or a resource policy that already exists for the account you wish to deploy Prowler in. It is recommended that you run Prowler from your security tooling (Audit) account. To update or verify that the audit account has permissions to ListAccounts, follow these steps.
+
+1. Navigate to the [AWS Organization console](https://console.aws.amazon.com/organizations).
+2. In the navigation pane, choose **Settings**.
+3. For Delegated administrator for AWS Organizations, include the following statement.
+
+    ```json
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+        {
+            "Sid": "Statement",
+            "Effect": "Allow",
+            "Principal": {
+            "AWS": "arn:aws:iam::<aws-account-id>:root"
+            },
+            "Action": "organizations:ListAccounts",
+            "Resource": "*"
+        }
+        ]
+    }
+    ```
+
+#### Step 3: Deploy the SATv2 solution
 
 1. Navigate to the [AWS CloudFormation console](https://console.aws.amazon.com/cloudformation) in the account you will run the tool from (ProwlerAccountID).
    
@@ -354,7 +406,7 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 ```
 
 With or without the optional EmailAddress parameter set, you can view the progress in the CodeBuild console.
-1. Navigate to the [CodeSuite console](https://console.aws.amazon.com/codesuite/).
+1. Navigate to the [CodeBuild console](https://console.aws.amazon.com/codesuite/).
 
 2. In the navigation pane, under **Build**, choose **Build projects**.
 
