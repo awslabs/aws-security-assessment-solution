@@ -380,7 +380,7 @@ This scan will add `--severity critical high` to the Prowler scan options. With 
 
 ### Full scan
 
-This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running the full 283 checks.
+This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running 359+ checks.
 
 You can also use the full scan to customize the scan however you would like.
 
