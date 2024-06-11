@@ -358,7 +358,10 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 --parameter-overrides ProwlerScanType=Intermediate
 ```
 
+Checks are frequently added, to see the latest checks, run `prowler aws --list-checks` command. An example has been provided below for each check level. 
+
 ### Basic Scan
+To see a list of checks, review [basic checks](./checks/basic_checks.txt).
 
 - Manual check - Maintain current contact details.
 - Find obsolete Lambda runtimes.
@@ -375,10 +378,12 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 - Ensure there are no S3 buckets open to Everyone or Any AWS user. 
 
 ### Intermediate scan 
+To see a list of checks, review [intermediate checks](./checks/intermediate_checks.txt).
 
 This scan will add `--severity critical high` to the Prowler scan options. With this selected Prowler will run all security checks that result in critical or high severity.
 
 ### Full scan
+To see a list of checks, review [full checks](./checks/full_checks.txt).
 
 This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running 359+ checks.
 
