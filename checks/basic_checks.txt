@@ -1,0 +1,25 @@
+                         _
+ _ __  _ __ _____      _| | ___ _ __
+| '_ \| '__/ _ \ \ /\ / / |/ _ \ '__|
+| |_) | | | (_) \ V  V /| |  __/ |
+| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.2.4
+|_| the handy multi-cloud security tool
+
+Date: 2024-06-11 10:54:00
+
+[account_maintain_current_contact_details] Maintain current contact details. - account [medium]
+[awslambda_function_using_supported_runtimes] Find obsolete Lambda runtimes. - lambda [medium]
+[cloudtrail_multi_region_enabled] Ensure CloudTrail is enabled in all regions - cloudtrail [high]
+[config_recorder_all_regions_enabled] Ensure AWS Config is enabled in all regions. - config [medium]
+[ec2_securitygroup_allow_ingress_from_internet_to_any_port] Ensure no security groups allow ingress from 0.0.0.0/0 or ::/0 to any port. - ec2 [high]
+[guardduty_is_enabled] Check if GuardDuty is enabled - guardduty [medium]
+[iam_password_policy_lowercase] Ensure IAM password policy require at least one lowercase letter - iam [medium]
+[iam_password_policy_number] Ensure IAM password policy require at least one number - iam [medium]
+[iam_password_policy_symbol] Ensure IAM password policy require at least one symbol - iam [medium]
+[iam_password_policy_uppercase] Ensure IAM password policy requires at least one uppercase letter - iam [medium]
+[iam_root_mfa_enabled] Ensure MFA is enabled for the root account - iam [critical]
+[iam_rotate_access_key_90_days] Ensure access keys are rotated every 90 days or less - iam [medium]
+[s3_bucket_public_access] Ensure there are no S3 buckets open to Everyone or Any AWS user. - s3 [critical]
+
+There are 13 available checks.
+
