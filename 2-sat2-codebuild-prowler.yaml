@@ -167,6 +167,9 @@ Resources:
     DeletionPolicy: Retain 
     Type: AWS::S3::Bucket
     Properties:
+      NotificationConfiguration:
+           EventBridgeConfiguration:
+                EventBridgeEnabled: !If [ EnableReporting, true, false ]
       BucketEncryption: 
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -422,7 +425,8 @@ Resources:
             post_build:
               commands:
                 - echo "Uploading reports to S3..."
-                - aws s3 cp --exclude "*" --include "*.csv" output/ s3://$BUCKET_REPORT/csv/ --recursive
+                - aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ s3://$BUCKET_REPORT/csv/ --recursive
+                - aws s3 cp --exclude "*" --include "*.csv" output/compliance/ s3://$BUCKET_REPORT/compliance/ --recursive
                 - aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/ --recursive
                 - aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/ --recursive
                 - aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/ --recursive
@@ -648,7 +652,8 @@ Resources:
         PublishCloudWatchMetricsEnabled: false
         RequesterPaysEnabled: false
         ResultConfiguration:
-          OutputLocation: !Sub s3://${ProwlerFindingsBucket}/reports
+          OutputLocation: !Sub s3://${ProwlerFindingsBucket}/athena_results
+        EnforceWorkGroupConfiguration: false
 
   qProwlerOrgSummary:
     Condition: EnableReporting
@@ -767,7 +772,8 @@ Resources:
                 print("Starting query...")
                 response = athena.start_query_execution(
                     QueryString="""SELECT * FROM \"AwsDataCatalog\".\"{}\".\"prowler\"""".format(S3_BUCKET),
-                    WorkGroup=WORKGROUP
+                    WorkGroup=WORKGROUP,
+                    ResultConfiguration={'OutputLocation': f's3://{S3_BUCKET}/reports'}
                     )
                 print(response)
               except ClientError as e:
@@ -833,7 +839,231 @@ Resources:
             InputTemplate: !Sub >-
               "The query to summarize reporting has <status>."
 
-              "You can view your results in the ${ProwlerFindingsBucket}/reporting bucket."
+              "You can view your results in the ${ProwlerFindingsBucket}/reports bucket."
+
+# PPTX reporting
+  ProwlerReportingLambdaRole:
+    Condition: EnableReporting
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AccessToS3
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                 - s3:GetBucketLocation
+                 - s3:GetObject
+                 - s3:ListBucket
+                 - s3:ListBucketMultipartUploads
+                 - s3:AbortMultipartUpload
+                 - s3:PutObject
+                 - s3:ListMultipartUploadPart
+                Resource: 
+                 - !GetAtt ProwlerFindingsBucket.Arn
+                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+        - PolicyName: AccessToCodeBuild
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'codebuild:StartBuild'
+                Resource: !GetAtt ProwlerReportingCodeBuild.Arn
+
+  ProwlerReportingLogGroup:
+    Condition: EnableReporting
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: CloudWatch Logs protects data at rest using encryption. All log groups are encrypted. By default, the CloudWatch Logs service manages the server-side encryption keys.
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProwlerReportingLambda}'
+      RetentionInDays: 7      
+
+  ProwlerReportingLambda:
+    Condition: EnableReporting
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: The ProwlerReportingLambdaRole gives Lambda access to write CloudWatch logs.
+          - id: W89
+            reason: Lambda is not deployed inside of a VPC.
+          - id: W92
+            reason: Reserved concurrent executions is not set.
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Sub ${ProwlerReportingLambdaRole.Arn}
+      Timeout: 120
+      Runtime: python3.10
+      Code:
+        ZipFile: |
+          import boto3
+          from botocore.exceptions import ClientError
+
+          def startCodeBuildReport(event, context):
+              print(event)
+              
+              bucket = event['detail']['bucket']['name']
+              key = event['detail']['object']['key']
+              full_path = f"s3://{bucket}/{key}"
+              print(f"Summary CSV from Athena: {full_path}")
+              
+              cb = boto3.client('codebuild')
+              try:
+                print("Starting build...")
+                response = cb.start_build(projectName='ProwlerReportingCodeBuild', \
+                environmentVariablesOverride=[
+                  {
+                      'name': 'ATHENA_SUMMARY_CSV',
+                      'value': full_path
+                  }])
+                print(response)
+              except ClientError as e:
+                print("Failed to start query")
+                print(e)
+
+          def lambda_handler(event,context):
+              startCodeBuildReport(event, context)
+
+  ProwlerReportingLambdaInvokePermission:
+    Condition: EnableReporting
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ProwlerReportingLambda.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ProwlerReportingS3Upload.Arn
+
+  ProwlerReportingS3Upload:
+    Condition: EnableReporting
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref ProwlerFindingsBucket
+          object:
+            key:
+              - wildcard: reports/*.csv
+      State: ENABLED
+      Targets:
+        - Id: toLambda
+          Arn: !GetAtt ProwlerReportingLambda.Arn
+
+  ProwlerReportingCodeBuildRole:
+    Condition: EnableReporting
+    Type: AWS::IAM::Role
+    Properties:
+      Path: '/service-role/'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      Policies:
+        - PolicyName: LogGroup
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+        - PolicyName: AccessToS3
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                 - s3:GetBucketLocation
+                 - s3:GetObject
+                 - s3:ListBucket
+                 - s3:ListBucketMultipartUploads
+                 - s3:AbortMultipartUpload
+                 - s3:PutObject
+                 - s3:ListMultipartUploadPart
+                Resource: 
+                 - !GetAtt ProwlerFindingsBucket.Arn
+                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+
+  ProwlerReportingCodeBuild:
+    Condition: EnableReporting
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W32
+            reason: CodeBuild uses the managed KMS key for S3.
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: ProwlerReportingCodeBuild
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: ATHENA_SUMMARY_CSV
+            Value: ""
+            Type: PLAINTEXT
+          - Name: BUCKET_REPORT
+            Value: !Ref ProwlerFindingsBucket
+            Type: PLAINTEXT  
+      Description: Create Prowler report
+      ServiceRole: !GetAtt ProwlerReportingCodeBuildRole.Arn
+      TimeoutInMinutes: 60
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.11
+              commands:
+                - echo "Downloading repo..."
+                - git clone https://github.com/awslabs/aws-security-assessment-solution.git
+                - cd satv2-reporting/reporting
+                - echo "Installing dependencies..."
+                - pip3 install -r requirements.txt
+            build:
+              commands:
+                - echo "Using Athena summary csv $ATHENA_SUMMARY_CSV"
+                - aws s3 cp $ATHENA_SUMMARY_CSV .
+                - python report.py
+            post_build:
+              commands:
+                - echo "Uploading report to S3..."
+                - aws s3 cp SHIP_v3_Updated.pptx s3://$BUCKET_REPORT/reports/
+                - echo "Done!"
 
 Outputs:
   AccountID: 

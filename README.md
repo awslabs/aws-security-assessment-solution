@@ -8,6 +8,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
 
 ## Table of Contents<!-- omit from toc -->
 - [Overview](#overview)
+- [Parameters](#parameters)
 - [Deployment](#deployment)
 - [Single account scan](#single-account-scan)
   - [AWS CloudShell](#aws-cloudshell)
@@ -42,6 +43,18 @@ The parameter (user input) defaults will run a basic scan in a single account. H
 Once the template is deployed, the CodeBuild project will run. The default assessment takes around 5 minutes to complete. The time to complete a security assessment will vary depending on the number of resources and the scan options selected. At the end of the assessments the reports are delivered to the created S3 Bucket.
 
 ![architecture diagram](img/architecture.png)
+
+## Parameters
+SATv2 can be customized by updating the CloudFormation parameters. This section summarizes the available options and provides a link to the section with more information.
+
+| Parameter | Description | More information |
+| --- | --- | ---| 
+| ProwlerScanType | Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions. | [Scan types](#scan-types) 
+| MultiAccountScan | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions. | [Multi-account scan](#multi-account-scan)
+| MultiAccountListOverride | Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | [Multi-account scan](#multi-account-scan)
+| EmailAddress | Specify an address if you want to receive an email when the assessment completes. | [Notifications](#notifications)
+| Reporting | Set this to true if you want to summarize the Prowler reports into a single csv and create a presentation. This is helpful when scanning multiple accounts. | [Reporting Summary](#reporting-summary)
+
 
 ## Deployment
 You can use this project to run Prowler across multiple accounts in an AWS Organization, or a single account. We provide instructions to use  AWS CloudShell or the AWS console. Choose an option to get started.
@@ -321,7 +334,7 @@ Determine if you have delegated administrator or a resource policy that already 
 </details>
 
 ## Review the results
-After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv file in the /reporting folder.
+After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv and presentation file in the /reports folder.
 
 If you didn't configure email alerts, you can monitor the progress from the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects).
 
@@ -425,7 +438,9 @@ With or without the optional EmailAddress parameter set, you can view the progre
 
 ## Reporting Summary
 
-You can optionally enable reporting to summarize multiple Prowler scan csv files into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reporting folder.
+You can optionally enable reporting to summarize multiple Prowler scan csv files into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reports folder.
+
+The consolidated csv file will be used to create a SHIP HealthCheck presentation. Once the csv file is written to the bucket, an EventBridge rule runs a Lambda function that starts a CodeBuild job. The updated presentation is stored in the same S3 bucket in the /reports folder.
 
 If you specify an email address while reporting is enabled, you will get a second email when the Athena query is finished. 
 
@@ -438,7 +453,7 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 --parameter-overrides MultiAccountScan=true Reporting=true EmailAddress=email@domain.com
 ```
 
-![reporting architecture diagram](img/reporting.png)
+![reporting architecture diagram](img/reporting2.png)
 
 A saved query is created as an example. This query counts the checks that failed across all the accounts assessed. To review and run the query, follow these steps:
 
