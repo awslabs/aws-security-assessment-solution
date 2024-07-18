@@ -1051,7 +1051,7 @@ Resources:
               commands:
                 - echo "Downloading repo..."
                 - git clone https://github.com/awslabs/aws-security-assessment-solution.git
-                - cd satv2-reporting/reporting
+                - cd aws-security-assessment-solution/reporting
                 - echo "Installing dependencies..."
                 - pip3 install -r requirements.txt
             build:
