@@ -159,8 +159,6 @@ Resources:
     Metadata:
       cfn_nag:
         rules_to_suppress:
-          - id: W51
-            reason: No bucket policy needed.
           - id: W35
             reason: No bucket logging needed.
     UpdateReplacePolicy: Retain
@@ -174,11 +172,30 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+  ProwlerFindingsBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref ProwlerFindingsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowSSLRequestsOnly
+            Principal: '*'
+            Action: 's3:*'
+            Effect: Deny
+            Resource:
+              - !Sub '${ProwlerFindingsBucket.Arn}'
+              - !Sub '${ProwlerFindingsBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
 
   CodeBuildStartBuild:
     Type: Custom::CodeBuildStartBuild
@@ -197,6 +214,9 @@ Resources:
               Service: lambda.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub ${AWS::AccountId}
       Path: /
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
@@ -285,12 +305,14 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          -
-            Action: 'sts:AssumeRole'
+          - Action: 'sts:AssumeRole'
             Effect: Allow
             Principal:
               Service:
                 - codebuild.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerCodeBuild'
       Policies:
         - PolicyName: LogGroup
           PolicyDocument:
@@ -689,6 +711,9 @@ Resources:
               Service: lambda.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub ${AWS::AccountId}
       Path: /
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
@@ -854,6 +879,9 @@ Resources:
               Service: lambda.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub ${AWS::AccountId}
       Path: /
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
@@ -981,12 +1009,14 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          -
-            Action: 'sts:AssumeRole'
+          - Action: 'sts:AssumeRole'
             Effect: Allow
             Principal:
               Service:
                 - codebuild.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerReportingCodeBuild'
       Policies:
         - PolicyName: LogGroup
           PolicyDocument:
