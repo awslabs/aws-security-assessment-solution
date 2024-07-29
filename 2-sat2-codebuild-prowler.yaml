@@ -122,11 +122,15 @@ Resources:
                 - cloudtrail:GetInsightSelectors
                 - codeartifact:List*
                 - codebuild:BatchGet*
+                - cognito-idp:GetUserPoolMfaConfig
+                - dlm:Get*
                 - drs:Describe*
                 - ds:Get*
                 - ds:Describe*
                 - ds:List*
+                - dynamodb:GetResourcePolicy
                 - ec2:GetEbsEncryptionByDefault
+                - ec2:GetInstanceMetadataDefaults
                 - ecr:Describe*
                 - ecr:GetRegistryScanningConfiguration
                 - elasticfilesystem:DescribeBackupPolicy
@@ -134,6 +138,7 @@ Resources:
                 - glue:GetSecurityConfiguration*
                 - glue:SearchTables
                 - lambda:GetFunction*
+                - lightsail:GetRelationalDatabases
                 - logs:FilterLogEvents
                 - macie2:GetMacieSession
                 - s3:GetAccountPublicAccessBlock
