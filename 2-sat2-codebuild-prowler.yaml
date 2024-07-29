@@ -385,9 +385,6 @@ Resources:
             build:
               commands:
                 - |
-                  if [[ $AWS_REGION =~ 'gov' ]]; then
-                      STS_ENDPOINT='--sts-endpoint-region us-gov-west-1'
-                  fi
 
                   if [[ $MULTI_ACCOUNT_SCAN = 'true' ]]; then
 
@@ -408,16 +405,16 @@ Resources:
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
-                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE $STS_ENDPOINT"
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE $STS_ENDPOINT
+                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
+                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE 
                           } &
                       done
 
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
                       echo "Running a single account scan."
-                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE $STS_ENDPOINT"
-                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE $STS_ENDPOINT
+                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
+                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE 
 
                   fi
 
