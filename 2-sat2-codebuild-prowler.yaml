@@ -131,6 +131,7 @@ Resources:
                 - dynamodb:GetResourcePolicy
                 - ec2:GetEbsEncryptionByDefault
                 - ec2:GetInstanceMetadataDefaults
+                - ec2:GetSnapshotBlockPublicAccessState
                 - ecr:Describe*
                 - ecr:GetRegistryScanningConfiguration
                 - elasticfilesystem:DescribeBackupPolicy
