@@ -2,10 +2,10 @@
  _ __  _ __ _____      _| | ___ _ __
 | '_ \| '__/ _ \ \ /\ / / |/ _ \ '__|
 | |_) | | | (_) \ V  V /| |  __/ |
-| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.2.4
+| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.3.2
 |_| the handy multi-cloud security tool
 
-Date: 2024-06-11 10:54:00
+Date: 2024-08-05 18:27:58
 
 [account_maintain_current_contact_details] Maintain current contact details. - account [medium]
 [awslambda_function_using_supported_runtimes] Find obsolete Lambda runtimes. - lambda [medium]

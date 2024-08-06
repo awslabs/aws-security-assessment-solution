@@ -1,4 +1,5 @@
-# This script runs the list checks command to create three text files with the latest checks.
+#!/bin/bash
+# This script runs the list checks command to create three text files with the latest checks. Run this from the project root.
 
 # Get basic checks
 prowler aws --list-checks -c \
