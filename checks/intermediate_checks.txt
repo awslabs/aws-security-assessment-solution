@@ -2,10 +2,10 @@
  _ __  _ __ _____      _| | ___ _ __
 | '_ \| '__/ _ \ \ /\ / / |/ _ \ '__|
 | |_) | | | (_) \ V  V /| |  __/ |
-| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.2.4
+| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.3.2
 |_| the handy multi-cloud security tool
 
-Date: 2024-06-11 10:54:01
+Date: 2024-08-05 18:28:00
 
 [acm_certificates_expiration_check] Check if ACM Certificates are about to expire in specific days or less - acm [high]
 [autoscaling_find_secrets_ec2_launch_configuration] Find secrets in EC2 Auto Scaling Launch Configuration - autoscaling [critical]
@@ -17,17 +17,21 @@ Date: 2024-06-11 10:54:01
 [cloudtrail_logs_s3_bucket_is_not_publicly_accessible] Ensure the S3 bucket CloudTrail logs is not publicly accessible - cloudtrail [critical]
 [cloudtrail_multi_region_enabled] Ensure CloudTrail is enabled in all regions - cloudtrail [high]
 [codeartifact_packages_external_public_publishing_disabled] Ensure CodeArtifact internal packages do not allow external public source publishing. - codeartifact [critical]
+[dms_instance_no_public_access] Ensure DMS instances are not publicly accessible. - dms [critical]
 [ec2_ami_public] Ensure there are no EC2 AMIs set as Public. - ec2 [critical]
 [ec2_ebs_public_snapshot] Ensure there are no EBS Snapshots set as Public. - ec2 [critical]
 [ec2_ebs_snapshot_account_block_public_access] Ensure that public access to EBS snapshots is disabled - ec2 [high]
 [ec2_elastic_ip_shodan] Check if any of the Elastic or Public IP are in Shodan (requires Shodan API KEY). - ec2 [high]
-[ec2_instance_port_cassandra_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to Elasticsearch and Kibana ports (TCP 9200, 9300, 5601). - ec2 [critical]
+[ec2_instance_port_cassandra_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to Cassandra ports (TCP 7000, 7001, 7199, 9042, 9160). - ec2 [critical]
 [ec2_instance_port_cifs_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 139 or 445 (CIFS). - ec2 [critical]
+[ec2_instance_port_elasticsearch_kibana_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to Elasticsearch and Kibana ports (TCP 9200, 9300, 5601). - ec2 [critical]
 [ec2_instance_port_ftp_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 20 or 21 (FTP) - ec2 [critical]
-[ec2_instance_port_kafka_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 11211 (Memcached). - ec2 [critical]
+[ec2_instance_port_kafka_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 9092 (Kafka). - ec2 [critical]
 [ec2_instance_port_kerberos_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 88, 464, 749 or 750 (Kerberos). - ec2 [critical]
 [ec2_instance_port_ldap_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 389 or 636 (LDAP). - ec2 [critical]
+[ec2_instance_port_memcached_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 11211 (Memcached). - ec2 [critical]
 [ec2_instance_port_mongodb_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 27017 or 27018 (MongoDB) - ec2 [critical]
+[ec2_instance_port_mysql_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 3306 (MySQL). - ec2 [critical]
 [ec2_instance_port_oracle_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 1521, 2483 or 2484 (Oracle). - ec2 [critical]
 [ec2_instance_port_postgresql_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 5432 (PostgreSQL) - ec2 [critical]
 [ec2_instance_port_rdp_exposed_to_internet] Ensure no EC2 instances allow ingress from the internet to TCP port 3389 (RDP) - ec2 [critical]
@@ -61,6 +65,7 @@ Date: 2024-06-11 10:54:01
 [eks_cluster_network_policy_enabled] Ensure Network Policy is Enabled and Set as Appropriate - eks [high]
 [eks_cluster_private_nodes_enabled] Ensure Clusters are created with Private Nodes - eks [high]
 [eks_endpoints_not_publicly_accessible] Ensure EKS Clusters are created with Private Endpoint Enabled and Public Access Disabled - eks [high]
+[elasticache_redis_cluster_backup_enabled] Ensure Elasticache Redis cache cluster has automatic backups enabled. - elasticache [high]
 [emr_cluster_account_public_block_enabled] EMR Account Public Access Block enabled. - emr [high]
 [eventbridge_bus_cross_account_access] Ensure that AWS EventBridge event buses do not allow unknown cross-account access for delivery of events. - eventbridge [high]
 [eventbridge_bus_exposed] Ensure that your AWS EventBridge event bus is not exposed to everyone - eventbridge [high]
@@ -71,6 +76,7 @@ Date: 2024-06-11 10:54:01
 [iam_avoid_root_usage] Avoid the use of the root accounts - iam [high]
 [iam_aws_attached_policy_no_administrative_privileges] Ensure IAM AWS-Managed policies that allow full "*:*" administrative privileges are not attached - iam [high]
 [iam_customer_attached_policy_no_administrative_privileges] Ensure IAM Customer-Managed policies that allow full "*:*" administrative privileges are not attached - iam [high]
+[iam_inline_policy_allows_privilege_escalation] Ensure no Inline IAM policies allow actions that may lead into Privilege Escalation - iam [high]
 [iam_inline_policy_no_administrative_privileges] Ensure inline policies that allow full "*:*" administrative privileges are not associated to IAM identities - iam [high]
 [iam_no_custom_policy_permissive_role_assumption] Ensure that no custom IAM policies exist which allow permissive role assumption (e.g. sts:AssumeRole on *) - iam [high]
 [iam_no_expired_server_certificates_stored] Ensure that all the expired SSL/TLS certificates stored in AWS IAM are removed. - iam [critical]
@@ -86,6 +92,7 @@ Date: 2024-06-11 10:54:01
 [kafka_cluster_unrestricted_access_disabled] Ensure Kafka Cluster has unrestricted access disabled - kafka [high]
 [lightsail_database_public] Check if the database has the public mode. - lightsail [high]
 [lightsail_instance_public] Ensure that Lightsail instances are not publicly accessible - lightsail [high]
+[neptune_cluster_storage_encrypted] Check if Neptune Clusters storage is encrypted at rest. - neptune [high]
 [opensearch_service_domains_not_publicly_accessible] Check if Amazon Opensearch/Elasticsearch domains are set as Public or if it has open policy access - opensearch [critical]
 [opensearch_service_domains_use_cognito_authentication_for_kibana] Check if Amazon Elasticsearch/Opensearch Service domains has either Amazon Cognito or SAML authentication for Kibana enabled - opensearch [high]
 [organizations_delegated_administrators] Check if AWS Organizations delegated administrators are trusted - organizations [high]
@@ -110,5 +117,5 @@ Date: 2024-06-11 10:54:01
 [ssm_managed_compliant_patching] Check if EC2 instances managed by Systems Manager are compliant with patching requirements. - ssm [high]
 [workspaces_volume_encryption_enabled] Ensure that your Amazon WorkSpaces storage volumes are encrypted in order to meet security and compliance requirements - workspaces [high]
 
-There are 102 available checks.
+There are 109 available checks.
 
