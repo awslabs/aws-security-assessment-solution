@@ -1,12 +1,52 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Self-Service Security Assessment Solutions (v2)
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: SATv2 options
+        Parameters:
+          - ProwlerScanType
+          - MultiAccountScan
+          - Reporting
+          - EmailAddress
+      - Label:
+          default: Advanced options
+        Parameters:
+          - ConcurrentAccountScans
+          - CodeBuildTimeout
+          - MultiAccountListOverride
+          - ProwlerOptions
+          - ProwlerRole
+          
+    ParameterLabels:
+      ProwlerOptions:
+        default: Prowler options
+      ProwlerScanType:
+        default: Prowler scan type
+      ProwlerRole:
+        default: Prowler role
+      MultiAccountScan:
+        default: Multi-Account scan
+      MultiAccountListOverride:
+        default: Multi-Account list override
+      EmailAddress:
+        default: (Optional) Email address
+      Reporting:
+        default: Reporting
+      ConcurrentAccountScans:
+        default: Concurrent account scans
+      CodeBuildTimeout:
+        default: CodeBuild timeout
+
 Parameters:
   ProwlerOptions:
     Description: 'Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify.'
     Type: String
     Default: aws --ignore-exit-code-3
   ProwlerScanType:
-    Description: 'Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions.'
+    Description: 'Specify which type of scan to perform. A basic scan runs 13 checks. An Intermediate scan runs all 109+ critical and high checks. A Full scan runs all 383+ checks.'
     Type: String
     AllowedValues:
       - 'Basic'
@@ -39,6 +79,20 @@ Parameters:
       - 'true'
       - 'false'
     Default: 'false'
+  ConcurrentAccountScans:
+    Description: 'For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three may incur additional costs.'
+    Type: String
+    AllowedValues:
+      - 'Three'
+      - 'Six'
+      - 'Twelve'
+    Default: 'Three'
+  CodeBuildTimeout:
+    Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).'
+    Type: Number
+    MinValue: 5
+    MaxValue: 2160
+    Default: 300
   
 Conditions:
   CreateProwlerRole: !Equals
@@ -73,6 +127,16 @@ Mappings:
       ProwlerOptions: --severity critical high
     Full:
       ProwlerOptions: ''
+  CodeBuildPerformanceOptionMap:
+    Three:
+      ParallelAccounts: 3
+      CodeBuildComputeType: BUILD_GENERAL1_SMALL
+    Six:
+      ParallelAccounts: 6
+      CodeBuildComputeType: BUILD_GENERAL1_MEDIUM
+    Twelve:
+      ParallelAccounts: 12
+      CodeBuildComputeType: BUILD_GENERAL1_LARGE
 
 Resources:
   #This is the role that CodeBuild assumes to perform the Prowler scan
@@ -365,7 +429,7 @@ Resources:
     Properties:
       Name: ProwlerCodeBuild
       Environment:
-        ComputeType: "BUILD_GENERAL1_SMALL"
+        ComputeType: !FindInMap [CodeBuildPerformanceOptionMap, !Ref ConcurrentAccountScans, 'CodeBuildComputeType']
         Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
         Type: "LINUX_CONTAINER"
         EnvironmentVariables:
@@ -393,9 +457,12 @@ Resources:
           - Name: AWS_ACCOUNT_ID
             Value: !Sub ${AWS::AccountId}
             Type: PLAINTEXT
+          - Name: PARALLEL_ACCOUNTS
+            Value: !FindInMap [CodeBuildPerformanceOptionMap, !Ref ConcurrentAccountScans, 'ParallelAccounts']
+            Type: PLAINTEXT
       Description: Run Prowler assessment
       ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
-      TimeoutInMinutes: 300
+      TimeoutInMinutes: !Ref CodeBuildTimeout
       Artifacts:
         Type: NO_ARTIFACTS
       Source:
@@ -428,8 +495,6 @@ Resources:
                       
                       echo "Using accounts $account_list."
 
-                      #Scan up to three accounts at the same time.
-                      PARALLEL_ACCOUNTS=3
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
