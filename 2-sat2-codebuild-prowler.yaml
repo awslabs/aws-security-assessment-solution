@@ -87,6 +87,7 @@ Parameters:
       - 'Six'
       - 'Twelve'
       - 'TwentyFour'
+      - 'FourtyEight'
     Default: 'Three'
   CodeBuildTimeout:
     Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).'
@@ -141,6 +142,9 @@ Mappings:
     TwentyFour:
       ParallelAccounts: 24
       CodeBuildComputeType: BUILD_GENERAL1_XLARGE
+    FourtyEight:
+      ParallelAccounts: 48
+      CodeBuildComputeType: BUILD_GENERAL1_2XLARGE
 Resources:
   #This is the role that CodeBuild assumes to perform the Prowler scan
   ProwlerIntegrationCodeBuildRole:
