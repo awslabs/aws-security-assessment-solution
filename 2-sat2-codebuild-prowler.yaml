@@ -86,7 +86,7 @@ Parameters:
       - 'Three'
       - 'Six'
       - 'Twelve'
-      - 'FourtyEight'
+      - 'FortyEight'
     Default: 'Three'
   CodeBuildTimeout:
     Description: 'Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).'
@@ -138,7 +138,7 @@ Mappings:
     Twelve:
       ParallelAccounts: 12
       CodeBuildComputeType: BUILD_GENERAL1_LARGE
-    FourtyEight:
+    FortyEight:
       ParallelAccounts: 48
       CodeBuildComputeType: BUILD_GENERAL1_XLARGE
 
