@@ -51,9 +51,14 @@ SATv2 can be customized by updating the CloudFormation parameters. This section 
 | --- | --- | ---| 
 | ProwlerScanType | Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions. | [Scan types](#scan-types) 
 | MultiAccountScan | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions. | [Multi-account scan](#multi-account-scan)
-| MultiAccountListOverride | Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | [Multi-account scan](#multi-account-scan)
-| EmailAddress | Specify an address if you want to receive an email when the assessment completes. | [Notifications](#notifications)
 | Reporting | Set this to true if you want to summarize the Prowler reports into a single csv and create a presentation. This is helpful when scanning multiple accounts. | [Reporting Summary](#reporting-summary)
+| EmailAddress | Specify an address if you want to receive an email when the assessment completes. | [Notifications](#notifications)
+| **Advanced Parameters**  |
+| ConcurrentAccountScans | For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three changes the size of the CodeBuild instance and may incur additional costs.
+| CodeBuildTimeout | Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours). |
+| MultiAccountListOverride | Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | [Multi-account scan](#multi-account-scan)
+| ProwlerOptions | Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify. This can also be used to specify a single check. | [Full scan](#full-scan)
+| ProwlerRole | The role that Prowler should assume to perform the scan. Change this if you want to specify your own role with different permissions.
 
 
 ## Deployment
