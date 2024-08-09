@@ -86,7 +86,6 @@ Parameters:
       - 'Three'
       - 'Six'
       - 'Twelve'
-      - 'TwentyFour'
       - 'FourtyEight'
     Default: 'Three'
   CodeBuildTimeout:
@@ -139,12 +138,10 @@ Mappings:
     Twelve:
       ParallelAccounts: 12
       CodeBuildComputeType: BUILD_GENERAL1_LARGE
-    TwentyFour:
-      ParallelAccounts: 24
-      CodeBuildComputeType: BUILD_GENERAL1_XLARGE
     FourtyEight:
       ParallelAccounts: 48
-      CodeBuildComputeType: BUILD_GENERAL1_2XLARGE
+      CodeBuildComputeType: BUILD_GENERAL1_XLARGE
+
 Resources:
   #This is the role that CodeBuild assumes to perform the Prowler scan
   ProwlerIntegrationCodeBuildRole:
