@@ -213,7 +213,11 @@ These instructions assume you already have the prerequisites for stack set opera
                 "Principal": {
                 "AWS": "arn:aws:iam::<aws-account-id>:root"
                 },
-                "Action": "organizations:ListAccounts",
+                "Action": [
+                    "organizations:ListAccounts",
+                    "organizations:DescribeAccount",
+                    "organizations:ListTagsForResource"
+			    ],
                 "Resource": "*"
             }
             ]
@@ -303,7 +307,11 @@ Determine if you have delegated administrator or a resource policy that already 
             "Principal": {
             "AWS": "arn:aws:iam::<aws-account-id>:root"
             },
-            "Action": "organizations:ListAccounts",
+            "Action": [
+                    "organizations:ListAccounts",
+                    "organizations:DescribeAccount",
+                    "organizations:ListTagsForResource"
+			    ],
             "Resource": "*"
         }
         ]
