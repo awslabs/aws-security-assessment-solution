@@ -24,6 +24,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
     - [Step 2: Enable delegated administrator for AWS Organizations](#step-2-enable-delegated-administrator-for-aws-organizations)
     - [Step 3: Deploy the SATv2 solution](#step-3-deploy-the-satv2-solution)
 - [Review the results](#review-the-results)
+  - [Prowler Dashboard](#prowler-dashboard)
 - [Scan types](#scan-types)
   - [Basic Scan](#basic-scan)
   - [Intermediate scan](#intermediate-scan)
@@ -370,6 +371,32 @@ To review the results, follow these steps.
 7. A new window will open with your report. You can use the filters to identify and prioritize the findings.
 
    ![Prowler findings](/img/prowler-findings.png)
+
+### Prowler Dashboard
+Prowler has a built in dashboard to review the results. To use the Prowler dashboard, Prowler must be installed locally and you must download the results of Prowler locally. 
+
+You must have the AWS Command Line Interface (CLI) and valid credentials. For more information, review the [AWS Command Line interface user guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html).  
+
+1. Install Prowler. For more information, review the [Prowler installation instructions](https://docs.prowler.com/projects/prowler-open-source/en/latest/#installation).
+
+    ```
+    pip install prowler
+    ```
+
+2. Get the name of the Amazon S3 bucket. The name of the bucket is in the CloudFormation console as ProwlerFindingsBucket resource. Alternatively, navigate to the S3 console and look for a bucket in the format `{stack_name}-prowlerfindingsbucket-{ID}`
+
+3. Download the CSVs and compliance data from S3. If you did not run a full scan, you may not have compliance data. Replace `{bucket_name}` with the name of your bucket.
+
+    ```
+    aws s3 sync s3://{bucket_name}/compliance/ output/compliance/
+    aws s3 sync s3://{bucket_name}/csv/ output/
+    ```
+
+4. Run the dashboard. Use the following command to run the dashboard. By default, it will start on http://127.0.0.1:11666/.
+
+    ```
+    prowler dashboard
+    ```
 
 ## Scan types
 
