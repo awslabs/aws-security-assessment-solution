@@ -242,10 +242,6 @@ Resources:
       NotificationConfiguration:
            EventBridgeConfiguration:
                 EventBridgeEnabled: !If [ EnableReporting, true, false ]
-      BucketEncryption: 
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
