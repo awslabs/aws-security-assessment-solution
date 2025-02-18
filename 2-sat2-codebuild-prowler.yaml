@@ -235,6 +235,8 @@ Resources:
         rules_to_suppress:
           - id: W35
             reason: No bucket logging needed.
+          - id: W41
+            reason: Amazon S3 now applies server-side encryption with Amazon S3 managed keys (SSE-S3) as the base level of encryption for every bucket in Amazon S3.
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain 
     Type: AWS::S3::Bucket
@@ -242,10 +244,6 @@ Resources:
       NotificationConfiguration:
            EventBridgeConfiguration:
                 EventBridgeEnabled: !If [ EnableReporting, true, false ]
-      BucketEncryption: 
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
