@@ -87,6 +87,7 @@ Resources:
                 - securityhub:GetFindings
                 - servicecatalog:Describe*
                 - servicecatalog:List*
+                - ssm:DescribeDocumentPermission
                 - ssm:GetDocument
                 - ssm-incidents:List*
                 - states:ListTagsForResource
