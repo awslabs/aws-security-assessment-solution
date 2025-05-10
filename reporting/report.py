@@ -85,7 +85,7 @@ logger.info(f"Public S3 Buckets: {s3_bucket_public_access}")
 logger.info(f"Multi-Region CloudTrail: {cloudtrail_multi_region_enabled}")
 logger.info(f"GuardDuty Enabled: {guardduty_is_enabled}")
 logger.info(f"Access Key Rotation: {iam_rotate_access_key_90_days}")
-logger.info(f"Password Policy (All findings): {iam_password_policy}")
+logger.info("Password Policy findings exist. Details are not logged for security reasons.")
 logger.info(f"Config Recorder (All Regions): {config_recorder_all_regions_enabled}")
 logger.info(f"Lambda Function (Supported Runtimes): {awslambda_function_using_supported_runtimes}")
 
