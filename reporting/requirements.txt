@@ -11,5 +11,5 @@ pytz==2024.1
 s3transfer==0.10.1
 six==1.16.0
 tzdata==2024.1
-urllib3==2.2.2
+urllib3==2.5.0
 XlsxWriter==3.2.0
