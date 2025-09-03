@@ -2,13 +2,13 @@
  _ __  _ __ _____      _| | ___ _ __
 | '_ \| '__/ _ \ \ /\ / / |/ _ \ '__|
 | |_) | | | (_) \ V  V /| |  __/ |
-| .__/|_|  \___/ \_/\_/ |_|\___|_|v4.5.0
+| .__/|_|  \___/ \_/\_/ |_|\___|_|v5.11.0
 |_| the handy multi-cloud security tool
 
-Date: 2024-11-05 13:45:22
+Date: 2025-09-03 13:36:11
 
 [account_maintain_current_contact_details] Maintain current contact details. - account [medium]
-[awslambda_function_using_supported_runtimes] Find obsolete Lambda runtimes. - lambda [medium]
+[awslambda_function_using_supported_runtimes] Find obsolete Lambda runtimes. - awslambda [medium]
 [cloudtrail_multi_region_enabled] Ensure CloudTrail is enabled in all regions - cloudtrail [high]
 [config_recorder_all_regions_enabled] Ensure AWS Config is enabled in all regions. - config [medium]
 [ec2_securitygroup_allow_ingress_from_internet_to_any_port] Ensure no security groups allow ingress from 0.0.0.0/0 or ::/0 to any port. - ec2 [high]
