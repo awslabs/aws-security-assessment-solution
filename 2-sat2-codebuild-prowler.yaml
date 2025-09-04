@@ -19,7 +19,7 @@ Metadata:
           - MultiAccountListOverride
           - ProwlerOptions
           - ProwlerRole
-          
+
     ParameterLabels:
       ProwlerOptions:
         default: Prowler options
@@ -94,7 +94,7 @@ Parameters:
     MinValue: 5
     MaxValue: 2160
     Default: 300
-  
+
 Conditions:
   CreateProwlerRole: !Equals
     - !Ref MultiAccountScan
@@ -102,28 +102,28 @@ Conditions:
 
   CreateEmailNotification: !Not [!Equals [!Ref EmailAddress, '']]
 
-  EnableReporting: !Equals 
+  EnableReporting: !Equals
     - !Ref Reporting
     - true
 
 Mappings:
   ProwlerScanParameters:
     Basic:
-      ProwlerOptions: > 
-        -c 
-        account_maintain_current_contact_details 
-        awslambda_function_using_supported_runtimes 
-        cloudtrail_multi_region_enabled 
-        config_recorder_all_regions_enabled 
-        ec2_securitygroup_allow_ingress_from_internet_to_any_port 
-        guardduty_is_enabled 
-        iam_password_policy_lowercase 
-        iam_password_policy_number 
-        iam_password_policy_symbol 
-        iam_password_policy_uppercase 
-        iam_root_mfa_enabled 
-        iam_rotate_access_key_90_days 
-        s3_bucket_public_access 
+      ProwlerOptions: >
+        -c
+        account_maintain_current_contact_details
+        awslambda_function_using_supported_runtimes
+        cloudtrail_multi_region_enabled
+        config_recorder_all_regions_enabled
+        ec2_securitygroup_allow_ingress_from_internet_to_any_port
+        guardduty_is_enabled
+        iam_password_policy_lowercase
+        iam_password_policy_number
+        iam_password_policy_symbol
+        iam_password_policy_uppercase
+        iam_root_mfa_enabled
+        iam_rotate_access_key_90_days
+        s3_bucket_public_access
     Intermediate:
       ProwlerOptions: --severity critical high
     Full:
@@ -153,7 +153,7 @@ Resources:
           - id: W28
             reason: Resource has an explicit name so Prowler can loop through and assume it in each account.
           - id: W76
-            reason: SPCM for IAM policy is higher than 25 due to managed polices, and additional polices. Each section of the role has a comment with the Prowler documentation describing the need for the privileges. 
+            reason: SPCM for IAM policy is higher than 25 due to managed polices, and additional polices. Each section of the role has a comment with the Prowler documentation describing the need for the privileges.
     Condition: CreateProwlerRole
     Type: 'AWS::IAM::Role'
     Properties:
@@ -164,80 +164,80 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' 
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
             Action:
               - 'sts:AssumeRole'
             Condition:
               ArnEquals:
                 aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole
       ManagedPolicyArns:
-      # Prowler requires these managed polices to perform all the checks
-      # https://docs.prowler.cloud/en/latest/getting-started/requirements/
+        # Prowler requires these managed polices to perform all the checks
+        # https://docs.prowler.cloud/en/latest/getting-started/requirements/
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/SecurityAudit'
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess'
       Policies:
-      # Prowler requires these additional read-only permissions. They are documented in the Prowler documentation.
-      # https://github.com/prowler-cloud/prowler/blob/master/permissions/prowler-additions-policy.json
+        # Prowler requires these additional read-only permissions. They are documented in the Prowler documentation.
+        # https://github.com/prowler-cloud/prowler/blob/master/permissions/prowler-additions-policy.json
         - PolicyName: ProwlerAdditions
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Action:
-                - account:Get*
-                - appstream:Describe*
-                - appstream:List*
-                - backup:List*
-                - backup:Get*
-                - bedrock:List*
-                - bedrock:Get*
-                - cloudtrail:GetInsightSelectors
-                - codeartifact:List*
-                - codebuild:BatchGet*
-                - codebuild:ListReportGroups
-                - cognito-idp:GetUserPoolMfaConfig
-                - dlm:Get*
-                - drs:Describe*
-                - ds:Get*
-                - ds:Describe*
-                - ds:List*
-                - dynamodb:GetResourcePolicy
-                - ec2:GetEbsEncryptionByDefault
-                - ec2:GetSnapshotBlockPublicAccessState
-                - ec2:GetInstanceMetadataDefaults
-                - ecr:Describe*
-                - ecr:GetRegistryScanningConfiguration
-                - elasticfilesystem:DescribeBackupPolicy
-                - glue:GetConnections
-                - glue:GetSecurityConfiguration*
-                - glue:SearchTables
-                - glue:GetMLTransforms
-                - lambda:GetFunction*
-                - lightsail:GetRelationalDatabases
-                - logs:FilterLogEvents
-                - macie2:GetMacieSession
-                - macie2:GetAutomatedDiscoveryConfiguration
-                - s3:GetAccountPublicAccessBlock
-                - shield:DescribeProtection
-                - shield:GetSubscriptionState
-                - securityhub:BatchImportFindings
-                - securityhub:GetFindings
-                - servicecatalog:Describe*
-                - servicecatalog:List*
-                - ssm:DescribeDocumentPermission
-                - ssm:GetDocument
-                - ssm-incidents:List*
-                - states:ListTagsForResource
-                - support:Describe*
-                - tag:GetTagKeys
-                - wellarchitected:List*
+                  - account:Get*
+                  - appstream:Describe*
+                  - appstream:List*
+                  - backup:List*
+                  - backup:Get*
+                  - bedrock:List*
+                  - bedrock:Get*
+                  - cloudtrail:GetInsightSelectors
+                  - codeartifact:List*
+                  - codebuild:BatchGet*
+                  - codebuild:ListReportGroups
+                  - cognito-idp:GetUserPoolMfaConfig
+                  - dlm:Get*
+                  - drs:Describe*
+                  - ds:Get*
+                  - ds:Describe*
+                  - ds:List*
+                  - dynamodb:GetResourcePolicy
+                  - ec2:GetEbsEncryptionByDefault
+                  - ec2:GetSnapshotBlockPublicAccessState
+                  - ec2:GetInstanceMetadataDefaults
+                  - ecr:Describe*
+                  - ecr:GetRegistryScanningConfiguration
+                  - elasticfilesystem:DescribeBackupPolicy
+                  - glue:GetConnections
+                  - glue:GetSecurityConfiguration*
+                  - glue:SearchTables
+                  - glue:GetMLTransforms
+                  - lambda:GetFunction*
+                  - lightsail:GetRelationalDatabases
+                  - logs:FilterLogEvents
+                  - macie2:GetMacieSession
+                  - macie2:GetAutomatedDiscoveryConfiguration
+                  - s3:GetAccountPublicAccessBlock
+                  - shield:DescribeProtection
+                  - shield:GetSubscriptionState
+                  - securityhub:BatchImportFindings
+                  - securityhub:GetFindings
+                  - servicecatalog:Describe*
+                  - servicecatalog:List*
+                  - ssm:DescribeDocumentPermission
+                  - ssm:GetDocument
+                  - ssm-incidents:List*
+                  - states:ListTagsForResource
+                  - support:Describe*
+                  - tag:GetTagKeys
+                  - wellarchitected:List*
                 Effect: Allow
                 Resource: '*'
               - Action:
-                - apigateway:GET
+                  - apigateway:GET
                 Effect: Allow
                 Resource:
-                - !Sub arn:${AWS::Partition}:apigateway:*::/restapis/*
-                - !Sub arn:${AWS::Partition}:apigateway:*::/apis/*
+                  - !Sub arn:${AWS::Partition}:apigateway:*::/restapis/*
+                  - !Sub arn:${AWS::Partition}:apigateway:*::/apis/*
 
   ProwlerFindingsBucket:
     Metadata:
@@ -248,12 +248,12 @@ Resources:
           - id: W41
             reason: Amazon S3 now applies server-side encryption with Amazon S3 managed keys (SSE-S3) as the base level of encryption for every bucket in Amazon S3.
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain 
+    DeletionPolicy: Retain
     Type: AWS::S3::Bucket
     Properties:
       NotificationConfiguration:
-           EventBridgeConfiguration:
-                EventBridgeEnabled: !If [ EnableReporting, true, false ]
+        EventBridgeConfiguration:
+          EventBridgeEnabled: !If [EnableReporting, true, false]
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -346,7 +346,7 @@ Resources:
           import boto3
           from botocore.exceptions import ClientError
           import cfnresponse
-                    
+
           def startBuild(event, context):
             responseData = {}
             cb = boto3.client('codebuild')
@@ -371,7 +371,7 @@ Resources:
             else:
               no_op(event,context)
 
-#This is the role that has privileges to assume Prowler member roles
+  #This is the role that has privileges to assume Prowler member roles
   ProwlerCodeBuildRole:
     Metadata:
       cfn_nag:
@@ -443,9 +443,14 @@ Resources:
     Properties:
       Name: ProwlerCodeBuild
       Environment:
-        ComputeType: !FindInMap [CodeBuildPerformanceOptionMap, !Ref ConcurrentAccountScans, 'CodeBuildComputeType']
-        Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-        Type: "LINUX_CONTAINER"
+        ComputeType:
+          !FindInMap [
+            CodeBuildPerformanceOptionMap,
+            !Ref ConcurrentAccountScans,
+            'CodeBuildComputeType',
+          ]
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
             Value: !Ref ProwlerFindingsBucket
@@ -454,7 +459,12 @@ Resources:
             Value: !Ref 'ProwlerOptions'
             Type: PLAINTEXT
           - Name: PROWLER_SCAN_OPTIONS
-            Value: !FindInMap [ProwlerScanParameters, !Ref ProwlerScanType, 'ProwlerOptions']
+            Value:
+              !FindInMap [
+                ProwlerScanParameters,
+                !Ref ProwlerScanType,
+                'ProwlerOptions',
+              ]
             Type: PLAINTEXT
           - Name: PROWLER_ROLE
             Value: !Ref ProwlerRole
@@ -472,7 +482,12 @@ Resources:
             Value: !Sub ${AWS::AccountId}
             Type: PLAINTEXT
           - Name: PARALLEL_ACCOUNTS
-            Value: !FindInMap [CodeBuildPerformanceOptionMap, !Ref ConcurrentAccountScans, 'ParallelAccounts']
+            Value:
+              !FindInMap [
+                CodeBuildPerformanceOptionMap,
+                !Ref ConcurrentAccountScans,
+                'ParallelAccounts',
+              ]
             Type: PLAINTEXT
       Description: Run Prowler assessment
       ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
@@ -500,20 +515,20 @@ Resources:
                       echo "Running multi-account scan."
 
                       if [[ $MULTI_ACCOUNT_LIST_OVERRIDE != '' ]]; then
-                          echo "Using account overrides."    
+                          echo "Using account overrides."
                           account_list=$MULTI_ACCOUNT_LIST_OVERRIDE
                       elif [[ $MULTI_ACCOUNT_LIST_OVERRIDE = '' ]]; then
-                          echo "Using accounts from aws organizations." 
+                          echo "Using accounts from aws organizations."
                           account_list=$(aws organizations list-accounts --query 'Accounts[?Status==`ACTIVE`].Id' --output text)
                       fi
-                      
+
                       echo "Using accounts $account_list."
 
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
                               echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE 
+                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE
                           } &
                       done
 
@@ -521,11 +536,11 @@ Resources:
 
                       echo "Running a single account scan."
                       echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
-                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE 
+                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE
 
                   fi
 
-                  wait   
+                  wait
             post_build:
               commands:
                 - echo "Uploading reports to S3..."
@@ -559,10 +574,10 @@ Resources:
     Condition: CreateEmailNotification
     Type: AWS::SNS::Topic
     Properties:
-      Subscription: 
+      Subscription:
         - Endpoint: !Ref EmailAddress
           Protocol: email
-  
+
   ProwlerSnsNotificationsPolicy:
     Condition: CreateEmailNotification
     Type: AWS::SNS::TopicPolicy
@@ -618,7 +633,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
         Name: !Ref ProwlerFindingsBucket
-        Description: !Sub "SATv2 assessment results in the ${ProwlerFindingsBucket}"
+        Description: !Sub 'SATv2 assessment results in the ${ProwlerFindingsBucket}'
 
   GlueTableProwlerResults:
     Condition: EnableReporting
@@ -627,13 +642,10 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseSATv2Findings
       TableInput:
-        Name: "prowler"
-        Description: "Results of the Prowler scan from SATv2"
+        Name: 'prowler'
+        Description: 'Results of the Prowler scan from SATv2'
         TableType: EXTERNAL_TABLE
-        Parameters: {
-            "skip.header.line.count": "1",
-            "classification": "csv",
-          }    
+        Parameters: { 'skip.header.line.count': '1', 'classification': 'csv' }
         StorageDescriptor:
           Columns:
             - Name: auth_method
@@ -725,11 +737,8 @@ Resources:
           StoredAsSubDirectories: False
           SerdeInfo:
             SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
-            Parameters: {
-              "escapeChar": "\\",
-              "quoteChar": "\"",
-              "separatorChar": ";"
-            }
+            Parameters:
+              { 'escapeChar': "\\", 'quoteChar': '"', 'separatorChar': ';' }
         Retention: 0
 
   LakeFormationPermissionsLambda:
@@ -738,12 +747,12 @@ Resources:
     Properties:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !Sub ${AthenaStartQueryLambdaRole.Arn}
-      Permissions: 
+      Permissions:
         - SELECT
       Resource:
         TableResource:
-             DatabaseName: !Ref GlueDatabaseSATv2Findings
-             Name: !Ref GlueTableProwlerResults
+          DatabaseName: !Ref GlueDatabaseSATv2Findings
+          Name: !Ref GlueTableProwlerResults
 
   SATv2Reporting:
     Condition: EnableReporting
@@ -764,20 +773,20 @@ Resources:
     Type: AWS::Athena::NamedQuery
     Properties:
       Database: !Ref GlueDatabaseSATv2Findings
-      Description: "Count the number of recommendations across all assessed accounts"
-      Name: "Prowler organization summary"
+      Description: 'Count the number of recommendations across all assessed accounts'
+      Name: 'Prowler organization summary'
       QueryString: !Sub |
         -- Count the number of recommendations across all assessed accounts.
-          SELECT 
-              check_id, 
+          SELECT
+              check_id,
               count(*) as count
-          FROM 
+          FROM
               "${GlueDatabaseSATv2Findings}"."prowler"
-          WHERE 
+          WHERE
               status = 'FAIL'
-          GROUP BY 
+          GROUP BY
               check_id
-          ORDER BY 
+          ORDER BY
               count desc
       WorkGroup: !Ref SATv2Reporting
 
@@ -809,24 +818,24 @@ Resources:
                 Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${SATv2Reporting}
               - Effect: Allow
                 Action:
-                 - s3:GetBucketLocation
-                 - s3:GetObject
-                 - s3:ListBucket
-                 - s3:ListBucketMultipartUploads
-                 - s3:AbortMultipartUpload
-                 - s3:PutObject
-                 - s3:ListMultipartUploadPart
-                Resource: 
-                 - !GetAtt ProwlerFindingsBucket.Arn
-                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:AbortMultipartUpload
+                  - s3:PutObject
+                  - s3:ListMultipartUploadPart
+                Resource:
+                  - !GetAtt ProwlerFindingsBucket.Arn
+                  - !Sub ${ProwlerFindingsBucket.Arn}/*
               - Effect: Allow
                 Action:
                   - 'glue:GetTable'
                   - 'glue:GetDatabase'
                 Resource:
-                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
-                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}
-                 - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseSATv2Findings}/${GlueTableProwlerResults}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseSATv2Findings}/${GlueTableProwlerResults}
 
   AthenaStartQueryLogGroup:
     Condition: EnableReporting
@@ -840,7 +849,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${AthenaStartQueryLambda}'
-      RetentionInDays: 7      
+      RetentionInDays: 7
 
   AthenaStartQueryLambda:
     Condition: EnableReporting
@@ -871,7 +880,7 @@ Resources:
 
           S3_BUCKET = os.environ['BUCKET_REPORT']
           WORKGROUP = os.environ['ATHENA_WORKGROUP']
-                  
+
           def startQuery(event, context):
               responseData = {}
               athena = boto3.client('athena')
@@ -896,8 +905,8 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt AthenaStartQueryLambda.Arn
-      Action: "lambda:InvokeFunction"
-      Principal: "events.amazonaws.com"
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
       SourceArn: !GetAtt CodeBuildCompleteRunSummary.Arn
 
   CodeBuildCompleteRunSummary:
@@ -948,7 +957,7 @@ Resources:
 
               "You can view your results in the ${ProwlerFindingsBucket}/reports bucket."
 
-# PPTX reporting
+  # PPTX reporting
   ProwlerReportingLambdaRole:
     Condition: EnableReporting
     Type: 'AWS::IAM::Role'
@@ -973,16 +982,16 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                 - s3:GetBucketLocation
-                 - s3:GetObject
-                 - s3:ListBucket
-                 - s3:ListBucketMultipartUploads
-                 - s3:AbortMultipartUpload
-                 - s3:PutObject
-                 - s3:ListMultipartUploadPart
-                Resource: 
-                 - !GetAtt ProwlerFindingsBucket.Arn
-                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:AbortMultipartUpload
+                  - s3:PutObject
+                  - s3:ListMultipartUploadPart
+                Resource:
+                  - !GetAtt ProwlerFindingsBucket.Arn
+                  - !Sub ${ProwlerFindingsBucket.Arn}/*
         - PolicyName: AccessToCodeBuild
           PolicyDocument:
             Statement:
@@ -1003,7 +1012,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ProwlerReportingLambda}'
-      RetentionInDays: 7      
+      RetentionInDays: 7
 
   ProwlerReportingLambda:
     Condition: EnableReporting
@@ -1029,12 +1038,12 @@ Resources:
 
           def startCodeBuildReport(event, context):
               print(event)
-              
+
               bucket = event['detail']['bucket']['name']
               key = event['detail']['object']['key']
               full_path = f"s3://{bucket}/{key}"
               print(f"Summary CSV from Athena: {full_path}")
-              
+
               cb = boto3.client('codebuild')
               try:
                 print("Starting build...")
@@ -1057,8 +1066,8 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt ProwlerReportingLambda.Arn
-      Action: "lambda:InvokeFunction"
-      Principal: "events.amazonaws.com"
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
       SourceArn: !GetAtt ProwlerReportingS3Upload.Arn
 
   ProwlerReportingS3Upload:
@@ -1115,16 +1124,16 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                 - s3:GetBucketLocation
-                 - s3:GetObject
-                 - s3:ListBucket
-                 - s3:ListBucketMultipartUploads
-                 - s3:AbortMultipartUpload
-                 - s3:PutObject
-                 - s3:ListMultipartUploadPart
-                Resource: 
-                 - !GetAtt ProwlerFindingsBucket.Arn
-                 - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:AbortMultipartUpload
+                  - s3:PutObject
+                  - s3:ListMultipartUploadPart
+                Resource:
+                  - !GetAtt ProwlerFindingsBucket.Arn
+                  - !Sub ${ProwlerFindingsBucket.Arn}/*
 
   ProwlerReportingCodeBuild:
     Condition: EnableReporting
@@ -1137,16 +1146,16 @@ Resources:
     Properties:
       Name: ProwlerReportingCodeBuild
       Environment:
-        ComputeType: "BUILD_GENERAL1_SMALL"
-        Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-        Type: "LINUX_CONTAINER"
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: ATHENA_SUMMARY_CSV
-            Value: ""
+            Value: ''
             Type: PLAINTEXT
           - Name: BUCKET_REPORT
             Value: !Ref ProwlerFindingsBucket
-            Type: PLAINTEXT  
+            Type: PLAINTEXT
       Description: Create Prowler report
       ServiceRole: !GetAtt ProwlerReportingCodeBuildRole.Arn
       TimeoutInMinutes: 60
@@ -1178,6 +1187,6 @@ Resources:
                 - echo "Done!"
 
 Outputs:
-  AccountID: 
+  AccountID:
     Description: ID that Prowler is running from
     Value: !GetAtt ProwlerCodeBuildRole.Arn
