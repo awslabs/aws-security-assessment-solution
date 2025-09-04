@@ -824,7 +824,7 @@ Resources:
                   - s3:ListBucketMultipartUploads
                   - s3:AbortMultipartUpload
                   - s3:PutObject
-                  - s3:ListMultipartUploadPart
+                  - s3:ListMultipartUploadParts
                 Resource:
                   - !GetAtt ProwlerFindingsBucket.Arn
                   - !Sub ${ProwlerFindingsBucket.Arn}/*
@@ -988,7 +988,7 @@ Resources:
                   - s3:ListBucketMultipartUploads
                   - s3:AbortMultipartUpload
                   - s3:PutObject
-                  - s3:ListMultipartUploadPart
+                  - s3:ListMultipartUploadParts
                 Resource:
                   - !GetAtt ProwlerFindingsBucket.Arn
                   - !Sub ${ProwlerFindingsBucket.Arn}/*
@@ -1130,7 +1130,7 @@ Resources:
                   - s3:ListBucketMultipartUploads
                   - s3:AbortMultipartUpload
                   - s3:PutObject
-                  - s3:ListMultipartUploadPart
+                  - s3:ListMultipartUploadParts
                 Resource:
                   - !GetAtt ProwlerFindingsBucket.Arn
                   - !Sub ${ProwlerFindingsBucket.Arn}/*
