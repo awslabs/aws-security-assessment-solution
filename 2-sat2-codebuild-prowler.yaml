@@ -725,7 +725,7 @@ Resources:
               Type: string
             - Name: account_uid
               Type: string
-            - Name: account_namse
+            - Name: account_name
               Type: string
             - Name: account_email
               Type: string
@@ -1255,6 +1255,8 @@ Resources:
               commands:
                 - echo "Uploading report to S3..."
                 - aws s3 cp SHIP_v3_Updated.pptx s3://$BUCKET_REPORT/reports/
+                - echo "Uploading html dashboard to S3..."
+                - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
                 - echo "Done!"
 
 Outputs:
