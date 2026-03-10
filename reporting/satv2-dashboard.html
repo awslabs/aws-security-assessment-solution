@@ -1,0 +1,2898 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SATv2 Results Dashboard</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+            color: rgb(15, 20, 26);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .file-selector {
+            padding: 30px;
+            background: #f8f9fa;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-input-container {
+            display: inline-block;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #5a6fd8;
+        }
+
+        .csv-url-input {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+
+        .load-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .load-btn:hover {
+            background: #218838;
+        }
+
+        .load-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .dashboard-content {
+            display: none;
+        }
+
+        .dashboard-content.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .pass {
+            color: #28a745;
+        }
+
+        .fail {
+            color: #dc3545;
+        }
+
+        .high {
+            color: #dc3545;
+        }
+
+        .medium {
+            color: #ffc107;
+        }
+
+        .low {
+            color: #17a2b8;
+        }
+
+        .section {
+            margin: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title i {
+            margin-right: 10px;
+            color: #667eea;
+        }
+
+        .section-content {
+            padding: 30px;
+        }
+
+        .mindmap-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: auto;
+            background: #fafafa;
+        }
+
+        .mindmap-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        .key-actions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .key-actions h4 {
+            color: #856404;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .key-actions h4 i {
+            margin-right: 10px;
+        }
+
+        .action-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #ffc107;
+        }
+
+        .action-item.high-priority {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .action-service {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .action-list {
+            margin: 5px 0 0 20px;
+            color: #666;
+        }
+
+        .action-list li {
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            padding: 30px;
+            background: white;
+            border-bottom: 1px solid #eee;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        select,
+        input {
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .results-container {
+            padding: 30px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-count {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .export-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .export-btn:hover {
+            background: #5a6fd8;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .results-table th:hover {
+            background: #e9ecef;
+        }
+
+        .results-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: top;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            max-width: 300px;
+        }
+
+        .results-table td:nth-child(1),
+        .results-table td:nth-child(2),
+        .results-table td:nth-child(5),
+        .results-table td:nth-child(6) {
+            white-space: nowrap;
+            max-width: none;
+            width: auto;
+        }
+
+        .results-table td:nth-child(7) {
+            max-width: 150px;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .status-pass {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .severity-badge {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .severity-high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .severity-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .severity-low {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-manual {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .severity-critical {
+            background: #e8d5f5;
+            color: #6f42c1;
+        }
+
+        .severity-informational {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .critical {
+            color: #6f42c1;
+        }
+
+        .informational {
+            color: #17a2b8;
+        }
+
+        .manual {
+            color: #6c757d;
+        }
+
+        .expandable-cell {
+            max-width: 300px;
+            cursor: pointer;
+            position: relative;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+        }
+
+        .expandable-cell:hover {
+            background: #f0f0f0;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 400px;
+            z-index: 1000;
+            display: none;
+            word-wrap: break-word;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #dc3545;
+            font-size: 1.1em;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 5px;
+        }
+
+        .expand-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #667eea;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        .expand-btn:hover {
+            background: #f0f0f0;
+        }
+
+        /* Mindmap specific styles */
+        .mindmap-node {
+            cursor: pointer;
+        }
+
+        .mindmap-node circle {
+            fill: #fff;
+            stroke: steelblue;
+            stroke-width: 3px;
+        }
+
+        .mindmap-node text {
+            font: 12px sans-serif;
+        }
+
+        .mindmap-link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2px;
+        }
+
+        /* Fullscreen modal styles */
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(5px);
+        }
+
+        .fullscreen-modal.active {
+            display: block;
+        }
+
+        .fullscreen-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fullscreen-header {
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .fullscreen-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .fullscreen-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .fullscreen-close {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+
+        .fullscreen-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .fullscreen-mindmap-container {
+            flex: 1;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .fullscreen-filters {
+            background: rgba(248, 249, 250, 0.95);
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(222, 226, 230, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .fullscreen-filters .filter-group {
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .fullscreen-filters select,
+        .fullscreen-filters input {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+        }
+
+        .fullscreen-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .fullscreen-legend .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .fullscreen-legend .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .filter-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .results-table {
+                font-size: 14px;
+            }
+
+            .results-table th,
+            .results-table td {
+                padding: 10px 8px;
+            }
+
+            .results-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .mindmap-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; max-width: 1600px; margin: 0 auto;">
+                <h1 style="font-size: 2.5em; font-weight: 400; margin: 0;">SATv2 results dashboard</h1>
+                <a href="https://github.com/awslabs/aws-security-assessment-solution/" target="_blank"
+                    style="color: white; text-decoration: none; padding: 10px 20px; border: 2px solid white; border-radius: 8px; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+
+        <div class="file-selector" id="fileSelector">
+            <div
+                style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+                <div class="instructions" style="margin: 0; padding: 15px; flex: 1; min-width: 300px;">
+                    <h3 style="margin-bottom: 5px;">Load your SATv2 results:</h3>
+                    <p style="margin: 0; font-size: 14px;">Enter an Amazon S3 pre-signed URL or upload a CSV file</p>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="url" id="csvUrl" class="csv-url-input"
+                            placeholder="Enter CSV file URL (e.g., https://your-bucket.s3.amazonaws.com/satv2-results.csv)"
+                            style="margin: 0; width: 400px;" />
+                        <button id="loadUrl" class="load-btn" style="margin: 0; height: 50px;">Load URL</button>
+                    </div>
+
+                    <div style="color: #666; font-weight: bold;">OR</div>
+
+                    <div style="position: relative; display: inline-block;">
+                        <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                        <label for="csvFile"
+                            style="display: inline-block; padding: 15px 30px; background: #667eea; color: white; border-radius: 8px; cursor: pointer; font-size: 16px; transition: background 0.3s ease; margin: 0; height: 50px; line-height: 20px; box-sizing: border-box;">Upload
+                            CSV file</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content" id="dashboardContent">
+            <!-- Overview Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Overview
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="stats-grid" id="statsGrid" style="padding: 0; background: transparent;">
+                        <div class="stat-card">
+                            <div class="stat-number" id="totalChecks">-</div>
+                            <div class="stat-label">Total Findings</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number pass" id="passCount">-</div>
+                            <div class="stat-label">Passed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number fail" id="failCount">-</div>
+                            <div class="stat-label">Failed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number manual" id="manualCount">-</div>
+                            <div class="stat-label">Manual</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number critical" id="criticalSeverity">-</div>
+                            <div class="stat-label">Critical Severity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number high" id="highSeverity">-</div>
+                            <div class="stat-label">High Severity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number medium" id="mediumSeverity">-</div>
+                            <div class="stat-label">Medium Severity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number low" id="lowSeverity">-</div>
+                            <div class="stat-label">Low Severity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number informational" id="informationalSeverity">-</div>
+                            <div class="stat-label">Informational Severity</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SRA Mindmap Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">
+                        SATv2 Security Assessment Mindmap
+                    </div>
+                    <button onclick="openFullscreenMindmap()"
+                        style="background: none; border: none; padding: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                        title="View fullscreen">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+                            style="width: 18px; height: 18px; fill: #232526; transition: fill 0.3s ease;"
+                            onmouseover="this.style.fill='#414345'" onmouseout="this.style.fill='#232526'">
+                            <path
+                                d="M344 0L488 0c13.3 0 24 10.7 24 24l0 144c0 9.7-5.8 18.5-14.8 22.2s-19.3 1.7-26.2-5.2l-39-39-87 87c-9.4 9.4-24.6 9.4-33.9 0l-32-32c-9.4-9.4-9.4-24.6 0-33.9l87-87L327 41c-6.9-6.9-8.9-17.2-5.2-26.2S334.3 0 344 0zM168 512L24 512c-13.3 0-24-10.7-24-24L0 344c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2l39 39 87-87c9.4-9.4 24.6-9.4 33.9 0l32 32c9.4 9.4 9.4 24.6 0 33.9l-87 87 39 39c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8z" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="controls" style="padding: 20px 0;">
+                        <div class="filter-group">
+                            <label for="mindmapStatusFilter">Status:</label>
+                            <select id="mindmapStatusFilter">
+                                <option value="">All Statuses</option>
+                                <option value="PASS">Pass</option>
+                                <option value="FAIL">Fail</option>
+                                <option value="MANUAL">Manual</option>
+                            </select>
+
+                            <label for="mindmapSeverityFilter">Severity:</label>
+                            <select id="mindmapSeverityFilter">
+                                <option value="">All Severities</option>
+                                <option value="CRITICAL">Critical</option>
+                                <option value="HIGH">High</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="LOW">Low</option>
+                                <option value="INFORMATIONAL">Informational</option>
+                            </select>
+
+                            <label for="mindmapServiceFilter">Service:</label>
+                            <select id="mindmapServiceFilter">
+                                <option value="">All Services</option>
+                            </select>
+
+                            <label for="mindmapRegionFilter">Region:</label>
+                            <select id="mindmapRegionFilter">
+                                <option value="">All Regions</option>
+                            </select>
+
+                            <input type="text" id="mindmapSearchBox" class="search-box"
+                                placeholder="Search checks, descriptions, or resources...">
+                        </div>
+                    </div>
+                    <div class="mindmap-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #1E8900;"></div>
+                            <span>All Checks Pass</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #FF9900;"></div>
+                            <span>Some Checks Fail (&lt;50%)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #D13212;"></div>
+                            <span>Most Checks Fail (≥50%)</span>
+                        </div>
+                    </div>
+                    <div id="mindmapContainer" class="mindmap-container"></div>
+                </div>
+            </div>
+
+            <!-- Key Actions Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">
+                        Key actions required
+                    </div>
+                    <button class="export-btn" onclick="copyGenerativeAIPrompt()"
+                        style="font-size: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"
+                            style="width: 16px; height: 16px; fill: currentColor;">
+                            <path
+                                d="M208 0L332.1 0c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9L448 336c0 26.5-21.5 48-48 48l-192 0c-26.5 0-48-21.5-48-48l0-288c0-26.5 21.5-48 48-48zM48 128l80 0 0 64-64 0 0 256 192 0 0-32 64 0 0 48c0 26.5-21.5 48-48 48L48 512c-26.5 0-48-21.5-48-48L0 176c0-26.5 21.5-48 48-48z" />
+                        </svg>
+                        Copy generative AI prompt
+                    </button>
+                </div>
+                <div class="section-content" id="keyActionsContent">
+                    <div class="loading">Analyzing failed checks...</div>
+                </div>
+            </div>
+
+            <!-- Detailed Findings Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">
+                        Detailed findings
+                    </div>
+                    <button class="export-btn" onclick="exportToCSV()"
+                        style="display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+                            style="width: 16px; height: 16px; fill: currentColor;">
+                            <path
+                                d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 242.7-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7 288 32zM64 352c-35.3 0-64 28.7-64 64l0 32c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-32c0-35.3-28.7-64-64-64l-101.5 0-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352 64 352zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z" />
+                        </svg>
+                        Export filtered results
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="controls" style="padding: 0; margin-bottom: 20px;">
+                        <div class="controls" style="padding: 0; margin-bottom: 20px;">
+                            <div class="filter-group" style="margin-bottom: 10px; flex-wrap: nowrap;">
+                                <label for="statusFilter">Status:</label>
+                                <select id="statusFilter">
+                                    <option value="">All Statuses</option>
+                                    <option value="PASS">Pass</option>
+                                    <option value="FAIL">Fail</option>
+                                    <option value="MANUAL">Manual</option>
+                                </select>
+
+                                <label for="severityFilter">Severity:</label>
+                                <select id="severityFilter">
+                                    <option value="">All Severities</option>
+                                    <option value="CRITICAL">Critical</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="INFORMATIONAL">Informational</option>
+                                </select>
+
+                                <label for="serviceFilter">Service:</label>
+                                <select id="serviceFilter">
+                                    <option value="">All Services</option>
+                                </select>
+
+                                <label for="titleFilter">Title:</label>
+                                <select id="titleFilter" style="flex: 1; min-width: 150px;">
+                                    <option value="">All Titles</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="margin-bottom: 10px;">
+                                <label for="regionFilter">Region:</label>
+                                <select id="regionFilter">
+                                    <option value="">All Regions</option>
+                                </select>
+
+                                <label for="mutedFilter">Muted:</label>
+                                <select id="mutedFilter">
+                                    <option value="false" selected>Non-Muted Only</option>
+                                    <option value="true">Muted Only</option>
+                                    <option value="">All</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="margin-bottom: 0;">
+                                <input type="text" id="searchBox" class="search-box"
+                                    placeholder="Search checks, descriptions, or resources..." style="min-width: 100%;">
+                            </div>
+                        </div>
+
+                        <div class="results-container" style="padding: 0;">
+                            <div class="results-header">
+                                <div class="results-count" id="resultsCount">Ready to load data...</div>
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div id="paginationControls" style="display: none; align-items: center; gap: 10px;">
+                                        <button id="prevPage" class="export-btn" style="padding: 8px 16px;">←
+                                            Previous</button>
+                                        <span id="pageInfo" style="color: #666; font-size: 14px;">Page 1 of 1</span>
+                                        <button id="nextPage" class="export-btn" style="padding: 8px 16px;">Next
+                                            →</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table class="results-table" id="resultsTable">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortTable('status')">Status</th>
+                                        <th onclick="sortTable('severity')">Severity</th>
+                                        <th onclick="sortTable('check_id')">Check ID</th>
+                                        <th onclick="sortTable('check_title')">Title</th>
+                                        <th onclick="sortTable('service_name')">Service</th>
+                                        <th onclick="sortTable('region')">Region</th>
+                                        <th onclick="sortTable('account_uid')">Account</th>
+                                        <th onclick="sortTable('status_extended')">Status Extended</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsBody">
+                                </tbody>
+                            </table>
+
+                            <div id="noResults" class="no-results hidden">
+                                No results match your current filters.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loadingMessage" class="loading hidden">Loading SATv2 results...</div>
+            <div id="errorMessage" class="error hidden"></div>
+        </div>
+
+        <div class="tooltip" id="tooltip"></div>
+
+        <!-- Fullscreen Mindmap Modal -->
+        <div id="fullscreenModal" class="fullscreen-modal">
+            <div class="fullscreen-content">
+                <div class="fullscreen-header">
+                    <div class="fullscreen-title">
+                        SATv2 Security Assessment Mindmap
+                    </div>
+                    <div class="fullscreen-controls">
+                        <button class="fullscreen-close" onclick="closeFullscreenMindmap()">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+
+                <div class="fullscreen-filters">
+                    <div class="filter-group">
+                        <label for="fullscreenStatusFilter">Status:</label>
+                        <select id="fullscreenStatusFilter">
+                            <option value="">All Statuses</option>
+                            <option value="PASS">Pass</option>
+                            <option value="FAIL">Fail</option>
+                            <option value="MANUAL">Manual</option>
+                        </select>
+
+                        <label for="fullscreenSeverityFilter">Severity:</label>
+                        <select id="fullscreenSeverityFilter">
+                            <option value="">All Severities</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="LOW">Low</option>
+                            <option value="INFORMATIONAL">Informational</option>
+                        </select>
+
+                        <label for="fullscreenServiceFilter">Service:</label>
+                        <select id="fullscreenServiceFilter">
+                            <option value="">All Services</option>
+                        </select>
+
+                        <label for="fullscreenRegionFilter">Region:</label>
+                        <select id="fullscreenRegionFilter">
+                            <option value="">All Regions</option>
+                        </select>
+
+                        <input type="text" id="fullscreenSearchBox" class="search-box"
+                            placeholder="Search checks, descriptions, or resources..."
+                            style="flex: 1; min-width: 300px;">
+                    </div>
+                </div>
+
+                <div class="fullscreen-mindmap-container">
+                    <div class="fullscreen-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #1E8900;"></div>
+                            <span>All Checks Pass</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #FF9900;"></div>
+                            <span>Some Checks Fail (&lt;50%)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #D13212;"></div>
+                            <span>Most Checks Fail (≥50%)</span>
+                        </div>
+                    </div>
+                    <div id="fullscreenMindmapContainer" style="width: 100%; height: calc(100% - 80px);"></div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let allData = [];
+            let filteredData = [];
+            let sortColumn = '';
+            let sortDirection = 'asc';
+            let currentPage = 1;
+            let rowsPerPage = 25;
+
+            // Initialize event listeners
+            document.addEventListener('DOMContentLoaded', function () {
+                document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+                document.getElementById('loadUrl').addEventListener('click', handleUrlLoad);
+                document.getElementById('statusFilter').addEventListener('change', applyFilters);
+                document.getElementById('severityFilter').addEventListener('change', applyFilters);
+                document.getElementById('serviceFilter').addEventListener('change', applyFilters);
+                document.getElementById('titleFilter').addEventListener('change', applyFilters);
+                document.getElementById('regionFilter').addEventListener('change', applyFilters);
+                document.getElementById('searchBox').addEventListener('input', applyFilters);
+                document.getElementById('mutedFilter').addEventListener('change', applyFilters);
+                document.getElementById('prevPage').addEventListener('click', () => changePage(-1));
+                document.getElementById('nextPage').addEventListener('click', () => changePage(1));
+
+                // Mindmap filter event listeners
+                document.getElementById('mindmapStatusFilter').addEventListener('change', applyMindmapFilters);
+                document.getElementById('mindmapSeverityFilter').addEventListener('change', applyMindmapFilters);
+                document.getElementById('mindmapServiceFilter').addEventListener('change', applyMindmapFilters);
+                document.getElementById('mindmapRegionFilter').addEventListener('change', applyMindmapFilters);
+                document.getElementById('mindmapSearchBox').addEventListener('input', applyMindmapFilters);
+
+                // Hide tooltip when clicking elsewhere
+                document.addEventListener('click', (event) => {
+                    if (!event.target.classList.contains('expandable-cell')) {
+                        document.getElementById('tooltip').style.display = 'none';
+                    }
+                });
+            });
+
+            // Handle file selection
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (file && file.type === 'text/csv') {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        parseCSVData(e.target.result);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    showError('Please select a valid CSV file.');
+                }
+            }
+
+            // Handle URL loading
+            function handleUrlLoad() {
+                const url = document.getElementById('csvUrl').value.trim();
+                if (!url) {
+                    showError('Please enter a valid URL.');
+                    return;
+                }
+
+                showLoading('Loading CSV from URL...');
+
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(csvText => {
+                        parseCSVData(csvText);
+                    })
+                    .catch(error => {
+                        console.error('Error loading CSV:', error);
+                        showError(`Error loading CSV: ${error.message}. Make sure the URL is accessible and the file has proper CORS headers or is publicly readable.`);
+                    });
+            }
+
+            // Parse CSV data
+            function parseCSVData(csvText) {
+                showLoading('Processing CSV data...');
+
+                try {
+                    const lines = csvText.split('\n');
+                    const headers = parseCSVLine(lines[0]);
+
+                    allData = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim()) {
+                            const values = parseCSVLine(lines[i]);
+                            if (values.length === headers.length) {
+                                const row = {};
+                                headers.forEach((header, index) => {
+                                    row[header.trim()] = values[index] ? values[index].trim() : '';
+                                });
+                                allData.push(row);
+                            }
+                        }
+                    }
+
+                    if (allData.length === 0) {
+                        throw new Error('No valid data found in CSV file');
+                    }
+
+                    filteredData = [...allData];
+                    initializeDashboard();
+
+                } catch (error) {
+                    console.error('Error parsing CSV:', error);
+                    showError(`Error parsing CSV: ${error.message}`);
+                }
+            }
+
+            // Parse CSV line handling quoted values
+            function parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+
+                result.push(current);
+                return result;
+            }
+
+            // Initialize dashboard after data is loaded
+            function initializeDashboard() {
+                hideLoading();
+                showDashboard();
+
+                // Apply default muted filter (non-muted only)
+                const mutedFilter = document.getElementById('mutedFilter');
+                if (mutedFilter) mutedFilter.value = 'false';
+
+                // Apply default sort: FAIL first, then by severity order
+                const STATUS_ORDER = { FAIL: 0, MANUAL: 1, PASS: 2 };
+
+                allData.sort((a, b) => {
+                    const statusDiff = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
+                    if (statusDiff !== 0) return statusDiff;
+                    const sevA = SEVERITY_ORDER[(a.severity || '').toLowerCase()] ?? 5;
+                    const sevB = SEVERITY_ORDER[(b.severity || '').toLowerCase()] ?? 5;
+                    return sevA - sevB;
+                });
+
+                // Apply filters (which includes muted filter) to set filteredData
+                applyFilters();
+
+                populateFilters();
+                generateKeyActions();
+                createMindmap();
+            }
+
+            // Show/hide UI elements
+            function showLoading(message = 'Loading...') {
+                document.getElementById('loadingMessage').textContent = message;
+                document.getElementById('loadingMessage').classList.remove('hidden');
+                document.getElementById('errorMessage').classList.add('hidden');
+            }
+
+            function hideLoading() {
+                document.getElementById('loadingMessage').classList.add('hidden');
+            }
+
+            function showError(message) {
+                document.getElementById('errorMessage').textContent = message;
+                document.getElementById('errorMessage').classList.remove('hidden');
+                document.getElementById('loadingMessage').classList.add('hidden');
+            }
+
+            function showDashboard() {
+                document.getElementById('dashboardContent').classList.add('active');
+            }
+
+            // Update statistics
+            function updateStats() {
+                // Overview stats are static — only respect the muted filter
+                const mutedFilter = document.getElementById('mutedFilter').value;
+                const statsData = mutedFilter ? allData.filter(row => row.muted === mutedFilter) : allData;
+                const total = statsData.length;
+                const passed = statsData.filter(row => row.status === 'PASS').length;
+                const failed = statsData.filter(row => row.status === 'FAIL').length;
+                const manual = statsData.filter(row => row.status === 'MANUAL').length;
+                const failedData = statsData.filter(row => row.status === 'FAIL');
+                const critical = failedData.filter(row => (row.severity || '').toLowerCase() === 'critical').length;
+                const high = failedData.filter(row => (row.severity || '').toLowerCase() === 'high').length;
+                const medium = failedData.filter(row => (row.severity || '').toLowerCase() === 'medium').length;
+                const low = failedData.filter(row => (row.severity || '').toLowerCase() === 'low').length;
+                const informational = failedData.filter(row => (row.severity || '').toLowerCase() === 'informational').length;
+
+                document.getElementById('totalChecks').textContent = total;
+                document.getElementById('passCount').textContent = passed;
+                document.getElementById('failCount').textContent = failed;
+                document.getElementById('manualCount').textContent = manual;
+                document.getElementById('criticalSeverity').textContent = critical;
+                document.getElementById('highSeverity').textContent = high;
+                document.getElementById('mediumSeverity').textContent = medium;
+                document.getElementById('lowSeverity').textContent = low;
+                document.getElementById('informationalSeverity').textContent = informational;
+            }
+
+            // Populate filter dropdowns
+            function populateFilters() {
+                const services = [...new Set(allData.map(row => row.service_name))].sort();
+                const titles = [...new Set(allData.map(row => row.check_title))].sort();
+                const regions = [...new Set(allData.map(row => row.region))].sort();
+
+                // Table filters
+                const serviceFilter = document.getElementById('serviceFilter');
+                const titleFilter = document.getElementById('titleFilter');
+                const regionFilter = document.getElementById('regionFilter');
+
+                // Mindmap filters
+                const mindmapServiceFilter = document.getElementById('mindmapServiceFilter');
+                const mindmapRegionFilter = document.getElementById('mindmapRegionFilter');
+
+                // Clear existing options (except first)
+                serviceFilter.innerHTML = '<option value="">All Services</option>';
+                titleFilter.innerHTML = '<option value="">All Titles</option>';
+                regionFilter.innerHTML = '<option value="">All Regions</option>';
+                mindmapServiceFilter.innerHTML = '<option value="">All Services</option>';
+                mindmapRegionFilter.innerHTML = '<option value="">All Regions</option>';
+
+                services.forEach(service => {
+                    if (service) {
+                        // Table filter
+                        const option = document.createElement('option');
+                        option.value = service;
+                        option.textContent = service;
+                        serviceFilter.appendChild(option);
+
+                        // Mindmap filter
+                        const mindmapOption = document.createElement('option');
+                        mindmapOption.value = service;
+                        mindmapOption.textContent = service;
+                        mindmapServiceFilter.appendChild(mindmapOption);
+                    }
+                });
+
+                regions.forEach(region => {
+                    if (region) {
+                        // Table filter
+                        const option = document.createElement('option');
+                        option.value = region;
+                        option.textContent = region;
+                        regionFilter.appendChild(option);
+
+                        // Mindmap filter
+                        const mindmapOption = document.createElement('option');
+                        mindmapOption.value = region;
+                        mindmapOption.textContent = region;
+                        mindmapRegionFilter.appendChild(mindmapOption);
+                    }
+                });
+
+                titles.forEach(title => {
+                    if (title) {
+                        const option = document.createElement('option');
+                        option.value = title;
+                        option.textContent = title;
+                        titleFilter.appendChild(option);
+                    }
+                });
+            }
+
+            // Apply filters
+            function applyFilters() {
+                const statusFilter = document.getElementById('statusFilter').value;
+                const severityFilter = document.getElementById('severityFilter').value;
+                const serviceFilter = document.getElementById('serviceFilter').value;
+                const titleFilterEl = document.getElementById('titleFilter');
+                const titleFilter = titleFilterEl.value;
+                const regionFilter = document.getElementById('regionFilter').value;
+                const mutedFilter = document.getElementById('mutedFilter').value;
+                const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+
+                // Cascade: repopulate Title dropdown based on Status, Severity, Service filters
+                const preFilteredForTitle = allData.filter(row => {
+                    return (!statusFilter || row.status === statusFilter) &&
+                        (!severityFilter || (row.severity || '').toUpperCase() === severityFilter) &&
+                        (!serviceFilter || row.service_name === serviceFilter);
+                });
+                const availableTitles = [...new Set(preFilteredForTitle.map(r => r.check_title))].sort();
+                const prevTitle = titleFilter;
+                titleFilterEl.innerHTML = '<option value="">All Titles</option>';
+                availableTitles.forEach(t => {
+                    if (t) {
+                        const opt = document.createElement('option');
+                        opt.value = t;
+                        opt.textContent = t;
+                        titleFilterEl.appendChild(opt);
+                    }
+                });
+                // Restore selection if still valid, otherwise reset
+                if (availableTitles.includes(prevTitle)) {
+                    titleFilterEl.value = prevTitle;
+                } else {
+                    titleFilterEl.value = '';
+                }
+                const activeTitleFilter = titleFilterEl.value;
+
+                filteredData = allData.filter(row => {
+                    return (!statusFilter || row.status === statusFilter) &&
+                        (!severityFilter || (row.severity || '').toUpperCase() === severityFilter) &&
+                        (!serviceFilter || row.service_name === serviceFilter) &&
+                        (!activeTitleFilter || row.check_title === activeTitleFilter) &&
+                        (!regionFilter || row.region === regionFilter) &&
+                        (!mutedFilter || row.muted === mutedFilter) &&
+                        (!searchTerm ||
+                            (row.check_id && row.check_id.toLowerCase().includes(searchTerm)) ||
+                            (row.check_title && row.check_title.toLowerCase().includes(searchTerm)) ||
+                            (row.description && row.description.toLowerCase().includes(searchTerm)) ||
+                            (row.resource_uid && row.resource_uid.toLowerCase().includes(searchTerm)) ||
+                            (row.remediation_recommendation_text && row.remediation_recommendation_text.toLowerCase().includes(searchTerm)));
+                });
+
+                currentPage = 1; // Reset to first page when filters change
+                updateStats();
+                renderTable();
+            }
+
+            // Change page
+            function changePage(direction) {
+                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+                const newPage = currentPage + direction;
+
+                if (newPage >= 1 && newPage <= totalPages) {
+                    currentPage = newPage;
+                    renderTable();
+                }
+            }
+
+            // Render table with pagination
+            function renderTable() {
+                const tbody = document.getElementById('resultsBody');
+                const resultsCount = document.getElementById('resultsCount');
+                const noResults = document.getElementById('noResults');
+                const table = document.getElementById('resultsTable');
+                const paginationControls = document.getElementById('paginationControls');
+
+                if (filteredData.length === 0) {
+                    table.classList.add('hidden');
+                    noResults.classList.remove('hidden');
+                    paginationControls.style.display = 'none';
+                    resultsCount.textContent = 'No results found';
+                    return;
+                }
+
+                table.classList.remove('hidden');
+                noResults.classList.add('hidden');
+
+                // Calculate pagination
+                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+                const startIndex = (currentPage - 1) * rowsPerPage;
+                const endIndex = Math.min(startIndex + rowsPerPage, filteredData.length);
+                const pageData = filteredData.slice(startIndex, endIndex);
+
+                // Update pagination controls
+                if (totalPages > 1) {
+                    paginationControls.style.display = 'flex';
+                    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('nextPage').disabled = currentPage === totalPages;
+                } else {
+                    paginationControls.style.display = 'none';
+                }
+
+                // Update results count
+                resultsCount.textContent = `Showing ${startIndex + 1}-${endIndex} of ${filteredData.length} results (${allData.length} total)`;
+
+                // Render table rows
+                tbody.innerHTML = '';
+
+                pageData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const statusClass = (row.status || '').toLowerCase();
+                    const severityClass = (row.severity || '').toLowerCase();
+                    tr.innerHTML = `
+                    <td><span class="status-badge status-${statusClass}">${row.status || ''}</span></td>
+                    <td><span class="severity-badge severity-${severityClass}">${row.severity || ''}</span></td>
+                    <td><strong>${row.check_id || ''}</strong></td>
+                    <td class="expandable-cell" onclick="showTooltip(event, '${escapeHtml(row.check_title || '')}')">${row.check_title || ''}</td>
+                    <td>${row.service_name || ''}</td>
+                    <td>${row.region || ''}</td>
+                    <td>${formatAccountDisplay(row.account_name, row.account_uid)}</td>
+                    <td class="expandable-cell" onclick="showTooltip(event, '${escapeHtml(row.status_extended || '')}')">${row.status_extended || ''}</td>
+                `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Generate Key Actions
+            function generateKeyActions() {
+                // Key actions are static — only respect the muted filter, like overview stats
+                const mutedFilter = document.getElementById('mutedFilter').value;
+                const baseData = mutedFilter ? allData.filter(row => row.muted === mutedFilter) : allData;
+                // Only show critical and high severity failed findings
+                const criticalChecks = baseData.filter(item => item.status === 'FAIL' && (item.severity || '').toLowerCase() === 'critical');
+                const highChecks = baseData.filter(item => item.status === 'FAIL' && (item.severity || '').toLowerCase() === 'high');
+                const failedChecks = [...criticalChecks, ...highChecks];
+                const container = document.getElementById('keyActionsContent');
+
+                if (failedChecks.length === 0) {
+                    container.innerHTML = '<div style="color: #28a745; text-align: center; padding: 20px; font-size: 1.2em;">🎉 No critical or high severity failures found!</div>';
+                    return;
+                }
+
+                let html = '';
+
+                // Render critical findings first
+                if (criticalChecks.length > 0) {
+                    html += renderKeyActionsForSeverity(criticalChecks, 'Critical');
+                }
+
+                // Then high findings
+                if (highChecks.length > 0) {
+                    html += renderKeyActionsForSeverity(highChecks, 'High');
+                }
+
+                // Add summary
+                const totalRegions = new Set(failedChecks.map(c => c.region)).size;
+                const totalAccounts = new Set(failedChecks.map(c => c.account_uid)).size;
+                const totalServices = new Set(failedChecks.map(c => c.service_name)).size;
+
+                html += `<div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #007bff;">`;
+                html += `<strong>Summary:</strong> ${criticalChecks.length} critical and ${highChecks.length} high severity failed checks across ${totalServices} services, ${totalRegions} regions, and ${totalAccounts} accounts.`;
+                html += `</div>`;
+
+                container.innerHTML = html;
+            }
+
+            function renderKeyActionsForSeverity(checks, severityLabel) {
+                const isCritical = severityLabel === 'Critical';
+                const badgeColor = isCritical ? '#6f42c1' : '#dc3545';
+
+                // Group by service
+                const serviceIssues = {};
+                checks.forEach(check => {
+                    if (!serviceIssues[check.service_name]) {
+                        serviceIssues[check.service_name] = {
+                            checks: [],
+                            regions: new Set(),
+                            accounts: new Set(),
+                            remediations: []
+                        };
+                    }
+                    serviceIssues[check.service_name].checks.push(check);
+                    serviceIssues[check.service_name].regions.add(check.region);
+                    serviceIssues[check.service_name].accounts.add(check.account_uid);
+
+                    if (check.remediation_recommendation_text && check.remediation_recommendation_text.trim()) {
+                        serviceIssues[check.service_name].remediations.push({
+                            text: check.remediation_recommendation_text.trim(),
+                            region: check.region,
+                            account: check.account_uid,
+                            checkId: check.check_id,
+                            severity: check.severity
+                        });
+                    }
+                });
+
+                let html = `<div class="key-actions" style="margin-bottom: 20px; ${isCritical ? 'border-color: #d5b8f5; background: #f5eeff;' : ''}">`;
+                html += `<h4 style="${isCritical ? 'color: #6f42c1;' : ''}">${severityLabel} severity findings (${checks.length})</h4>`;
+
+                Object.keys(serviceIssues).forEach(service => {
+                    const serviceData = serviceIssues[service];
+                    const issues = serviceData.checks;
+                    const regions = Array.from(serviceData.regions);
+                    const accounts = Array.from(serviceData.accounts);
+
+                    const actionClass = isCritical ? 'action-item high-priority' : 'action-item high-priority';
+
+                    html += `<div class="${actionClass}">`;
+                    html += `<div class="action-service">${service} (${issues.length} failed checks across ${regions.length} regions, ${accounts.length} accounts)</div>`;
+                    html += '<ul class="action-list">';
+
+                    if (serviceData.remediations.length > 0) {
+                        const summarizedActions = summarizeRemediations(serviceData.remediations, regions, accounts);
+                        summarizedActions.forEach(action => {
+                            html += `<li>${action}</li>`;
+                        });
+                    } else {
+                        html += `<li>Review ${service} configuration and remediate failed checks</li>`;
+                    }
+
+                    html += '</ul></div>';
+                });
+
+                html += '</div>';
+                return html;
+            }
+
+            // Intelligent remediation summarization function
+            function summarizeRemediations(remediations, regions, accounts) {
+                // Group similar remediations
+                const groupedActions = {};
+                const summarized = [];
+
+                remediations.forEach(rem => {
+                    // Create a normalized key by removing region/account specific details
+                    let normalizedText = rem.text;
+
+                    // STEP 1: Most aggressive approach - replace any quoted content after --account-details
+                    normalizedText = normalizedText.replace(/--account-details\s+'[^']+'/g, '--account-details [ACCOUNTS]');
+                    normalizedText = normalizedText.replace(/--account-details\s+"[^"]+"/g, '--account-details [ACCOUNTS]');
+
+                    // STEP 2: Also try without the space requirement
+                    normalizedText = normalizedText.replace(/--account-details'[^']+'/g, '--account-details [ACCOUNTS]');
+                    normalizedText = normalizedText.replace(/--account-details"[^"]+"/g, '--account-details [ACCOUNTS]');
+
+                    // STEP 3: Handle --account-ids format
+                    normalizedText = normalizedText.replace(/--account-ids\s+[\d\s,]+/g, '--account-ids [ACCOUNTS]');
+
+                    // STEP 4: Replace long sequences of account IDs (12+ digits in a row with commas)
+                    normalizedText = normalizedText.replace(/\d{12}(?:,\d{12}){2,}/g, '[ACCOUNTS]');
+
+                    // STEP 5: Replace AWS regions
+                    normalizedText = normalizedText.replace(/\b(us-east-[12]|us-west-[12]|eu-central-[12]|eu-north-1|eu-west-[123]|eu-south-[12]|ap-northeast-[123]|ap-south-[12]|ap-southeast-[1234567]|ap-east-[12]|ca-central-1|ca-west-1|sa-east-1|me-central-1|me-south-1|af-south-1|il-central-1|mx-central-1)\b/gi, '[REGION]');
+
+                    // STEP 6: Replace any remaining standalone 12-digit numbers
+                    normalizedText = normalizedText.replace(/\b\d{12}\b/g, '[ACCOUNT]');
+
+                    // STEP 7: Clean up multiple placeholders
+                    normalizedText = normalizedText.replace(/(\[ACCOUNT\][\s,]*){2,}/g, '[ACCOUNTS]');
+                    normalizedText = normalizedText.replace(/(\[REGION\][\s,]*){2,}/g, '[REGIONS]');
+
+                    // STEP 8: Clean up whitespace
+                    normalizedText = normalizedText.replace(/\s+/g, ' ').trim();
+
+                    if (!groupedActions[normalizedText]) {
+                        groupedActions[normalizedText] = {
+                            originalText: rem.text,
+                            regions: new Set(),
+                            accounts: new Set(),
+                            severities: new Set(),
+                            count: 0,
+                            checkIds: new Set()
+                        };
+                    }
+
+                    groupedActions[normalizedText].regions.add(rem.region);
+                    groupedActions[normalizedText].accounts.add(rem.account);
+                    groupedActions[normalizedText].severities.add(rem.severity);
+                    groupedActions[normalizedText].checkIds.add(rem.checkId);
+                    groupedActions[normalizedText].count++;
+                });
+
+                // Convert grouped actions to summarized text
+                Object.entries(groupedActions).forEach(([normalizedText, data]) => {
+                    let actionText = normalizedText;
+
+                    // Always apply cleanup, even for single occurrences
+                    const regionList = Array.from(data.regions).sort();
+                    const accountList = Array.from(data.accounts);
+
+                    // Create region summary
+                    let regionSummary;
+                    if (regionList.length > 4) {
+                        const regionGroups = groupRegionsByArea(regionList);
+                        regionSummary = formatRegionGroups(regionGroups, regionList.length);
+                    } else if (regionList.length > 1) {
+                        regionSummary = `${regionList.length} regions (${regionList.join(', ')})`;
+                    } else {
+                        regionSummary = regionList[0] || '[REGION]';
+                    }
+
+                    // Create account summary
+                    let accountSummary;
+                    if (accountList.length > 3) {
+                        accountSummary = `${accountList.length} accounts`;
+                    } else if (accountList.length > 1) {
+                        accountSummary = `${accountList.length} accounts (${accountList.join(', ')})`;
+                    } else {
+                        accountSummary = accountList[0] || '[ACCOUNTS]';
+                    }
+
+                    // Replace placeholders with summaries
+                    actionText = actionText
+                        .replace(/\[REGIONS?\]/g, regionSummary)
+                        .replace(/\[ACCOUNTS?\]/g, accountSummary);
+
+                    // Clean up CLI command formatting
+                    actionText = actionText
+                        .replace(/--region\s+/g, 'across ')
+                        .replace(/--account-ids\s+/g, 'for ')
+                        .replace(/--account-details\s+/g, 'for ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    // Add count if multiple similar issues
+                    if (data.count > 1) {
+                        actionText += ` (${data.count} similar issues)`;
+                    }
+
+                    summarized.push(actionText);
+                });
+
+                // Sort alphabetically for consistent ordering
+                return summarized.sort((a, b) => a.localeCompare(b));
+            }
+
+            // Helper function to group regions by geographic area
+            function groupRegionsByArea(regions) {
+                const groups = {
+                    'US': [],
+                    'Europe': [],
+                    'Asia Pacific': [],
+                    'Middle East': [],
+                    'Africa': [],
+                    'Canada': [],
+                    'South America': [],
+                    'Israel': [],
+                    'Mexico': []
+                };
+
+                regions.forEach(region => {
+                    if (region.startsWith('us-')) {
+                        groups['US'].push(region);
+                    } else if (region.startsWith('eu-')) {
+                        groups['Europe'].push(region);
+                    } else if (region.startsWith('ap-')) {
+                        groups['Asia Pacific'].push(region);
+                    } else if (region.startsWith('me-')) {
+                        groups['Middle East'].push(region);
+                    } else if (region.startsWith('af-')) {
+                        groups['Africa'].push(region);
+                    } else if (region.startsWith('ca-')) {
+                        groups['Canada'].push(region);
+                    } else if (region.startsWith('sa-')) {
+                        groups['South America'].push(region);
+                    } else if (region.startsWith('il-')) {
+                        groups['Israel'].push(region);
+                    } else if (region.startsWith('mx-')) {
+                        groups['Mexico'].push(region);
+                    } else {
+                        groups['Other'] = groups['Other'] || [];
+                        groups['Other'].push(region);
+                    }
+                });
+
+                // Remove empty groups
+                Object.keys(groups).forEach(key => {
+                    if (groups[key].length === 0) {
+                        delete groups[key];
+                    }
+                });
+
+                return groups;
+            }
+
+            // Helper function to format region groups for display
+            function formatRegionGroups(regionGroups, totalCount) {
+                const groupDescriptions = [];
+
+                Object.entries(regionGroups).forEach(([area, regions]) => {
+                    if (regions.length === 1) {
+                        groupDescriptions.push(regions[0]);
+                    } else if (regions.length <= 2) {
+                        groupDescriptions.push(`${regions.join(', ')}`);
+                    } else {
+                        groupDescriptions.push(`${regions.length} ${area} regions (${regions.slice(0, 2).join(', ')}, ...)`);
+                    }
+                });
+
+                return `${totalCount} regions: ${groupDescriptions.join(', ')}`;
+            }
+
+            // Apply mindmap filters
+            function applyMindmapFilters() {
+                createMindmap(); // Recreate mindmap with current filters
+            }
+
+            // Create Mindmap Visualization
+            function createMindmap() {
+                const container = document.getElementById('mindmapContainer');
+                container.innerHTML = '';
+
+                if (!allData || allData.length === 0) {
+                    container.innerHTML = '<div style="padding:20px;text-align:center;">No data available for mindmap</div>';
+                    return;
+                }
+
+                // Apply mindmap filters to data
+                const mindmapStatusFilter = document.getElementById('mindmapStatusFilter')?.value || '';
+                const mindmapSeverityFilter = document.getElementById('mindmapSeverityFilter')?.value || '';
+                const mindmapServiceFilter = document.getElementById('mindmapServiceFilter')?.value || '';
+                const mindmapRegionFilter = document.getElementById('mindmapRegionFilter')?.value || '';
+                const mindmapSearchTerm = document.getElementById('mindmapSearchBox')?.value.toLowerCase() || '';
+
+                const filteredMindmapData = allData.filter(row => {
+                    return (!mindmapStatusFilter || row.status === mindmapStatusFilter) &&
+                        (!mindmapSeverityFilter || (row.severity || '').toUpperCase() === mindmapSeverityFilter) &&
+                        (!mindmapServiceFilter || row.service_name === mindmapServiceFilter) &&
+                        (!mindmapRegionFilter || row.region === mindmapRegionFilter) &&
+                        (!mindmapSearchTerm ||
+                            (row.check_id && row.check_id.toLowerCase().includes(mindmapSearchTerm)) ||
+                            (row.check_title && row.check_title.toLowerCase().includes(mindmapSearchTerm)) ||
+                            (row.description && row.description.toLowerCase().includes(mindmapSearchTerm)) ||
+                            (row.resource_uid && row.resource_uid.toLowerCase().includes(mindmapSearchTerm)) ||
+                            (row.remediation_recommendation_text && row.remediation_recommendation_text.toLowerCase().includes(mindmapSearchTerm)));
+                });
+
+                if (filteredMindmapData.length === 0) {
+                    container.innerHTML = '<div style="padding:20px;text-align:center;">No data matches the current filters</div>';
+                    return;
+                }
+
+                // Process filtered data for mindmap
+                const orgData = processData(filteredMindmapData);
+
+                // Create enhanced D3 visualization
+                const containerRect = container.getBoundingClientRect();
+                const width = containerRect.width || 1200;
+                const height = 600;
+                const margin = { top: 40, right: 40, bottom: 40, left: 40 };
+
+                const svg = d3.select('#mindmapContainer')
+                    .append('svg')
+                    .attr('width', '100%')
+                    .attr('height', height)
+                    .attr('viewBox', `0 0 ${width} ${height}`)
+                    .style('background', 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)')
+                    .style('border-radius', '8px');
+
+                const g = svg.append('g')
+                    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+                // Add zoom and pan functionality
+                const zoom = d3.zoom()
+                    .scaleExtent([0.5, 3])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // Create tree layout
+                const tree = d3.tree()
+                    .size([height - margin.top - margin.bottom, width - margin.left - margin.right])
+                    .separation((a, b) => {
+                        // Use generous spacing to prevent overlapping in small view
+                        if (a.parent === b.parent) {
+                            // Same parent - use generous spacing for higher levels
+                            if (a.depth <= 1) return 3.0;      // Account level - more space
+                            if (a.depth === 2) return 2.5;     // Region level - good space
+                            if (a.depth === 3) return 2.0;     // Service level - moderate space
+                            return 1.5;                         // Individual checks - reasonable space
+                        } else {
+                            // Different parents - even more spacing for small view
+                            if (a.depth <= 1) return 3.5;      // Account level
+                            if (a.depth === 2) return 3.0;     // Region level
+                            if (a.depth === 3) return 2.5;     // Service level
+                            return 2.0;                         // Individual checks
+                        }
+                    });
+
+                const root = d3.hierarchy(orgData);
+
+                // Collapse account nodes by default (depth 1 and deeper)
+                root.descendants().forEach(d => {
+                    if (d.depth >= 1) {
+                        d._children = d.children;
+                        d.children = null;
+                    }
+                });
+
+                let i = 0; // Counter for node IDs
+                update(root);
+
+                function update(source) {
+                    const treeData = tree(root);
+                    const nodes = treeData.descendants();
+                    const links = treeData.descendants().slice(1);
+
+                    // Update node positions with closer horizontal levels
+                    const maxDepth = Math.max(...nodes.map(d => d.depth));
+                    const horizontalSpacing = maxDepth > 0 ? (width - margin.left - margin.right) / maxDepth : 200;
+                    nodes.forEach(d => {
+                        d.y = d.depth * Math.max(horizontalSpacing * 0.7, 100); // Reduce level spacing by 30%
+                    });
+
+                    // Update nodes
+                    const node = g.selectAll('g.node')
+                        .data(nodes, d => d.id || (d.id = ++i));
+
+                    const nodeEnter = node.enter().append('g')
+                        .attr('class', 'node')
+                        .attr('transform', d => `translate(${source.y0 || 0},${source.x0 || 0})`)
+                        .style('opacity', 0);
+
+                    // Add circles for nodes
+                    nodeEnter.append('circle')
+                        .attr('r', 1e-6)
+                        .style('fill', d => getNodeColor(d.data))
+                        .style('stroke', 'rgb(15, 20, 26)')
+                        .style('stroke-width', '2px')
+                        .style('cursor', 'pointer')
+                        .style('filter', 'drop-shadow(2px 2px 4px rgba(0,0,0,0.2))')
+                        .on('click', click);
+
+                    // Add labels
+                    nodeEnter.append('text')
+                        .attr('dy', '.35em')
+                        .attr('x', d => {
+                            // Increase padding based on circle size to prevent overlap
+                            let padding;
+                            if (d.depth === 0) padding = 35;      // Organization (circle r=25 + 10px padding)
+                            else if (d.depth === 1) padding = 30; // Account (circle r=20 + 10px padding)
+                            else if (d.depth === 2) padding = 25; // Region (circle r=15 + 10px padding)
+                            else if (d.depth === 3) padding = 22; // Service (circle r=12 + 10px padding)
+                            else padding = 18;                     // Individual checks (circle r=8 + 10px padding)
+
+                            return d.children || d._children ? -padding : padding;
+                        })
+                        .style('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                        .style('font-family', 'Segoe UI, sans-serif')
+                        .style('font-size', d => {
+                            if (d.depth === 0) return '16px';      // Organization
+                            if (d.depth === 1) return '14px';      // Account
+                            if (d.depth === 2) return '12px';      // Region
+                            if (d.depth === 3) return '11px';      // Service
+                            return '9px';                           // Individual Check
+                        })
+                        .style('font-weight', d => d.depth <= 1 ? 'bold' : 'normal')
+                        .style('fill', '#333')
+                        .text(d => {
+                            let name = d.data.name;
+
+                            // Add pass/fail counts in parentheses for nodes with totals
+                            if (d.data.total) {
+                                name += ` (${d.data.pass}/${d.data.total})`;
+                            }
+
+                            // Truncate longer names based on depth, but allow full titles for individual checks
+                            let maxLength;
+                            if (d.depth === 0) maxLength = 40; // Increased to accommodate counts
+                            else if (d.depth === 1) maxLength = 35;
+                            else if (d.depth === 2) maxLength = 30;
+                            else if (d.depth === 3) maxLength = 25;
+                            else return name; // Individual checks - show full title with counts
+
+                            if (name.length > maxLength) {
+                                return name.substring(0, maxLength - 3) + '...';
+                            }
+                            return name;
+                        });
+
+                    // Add expand/collapse indicators
+                    nodeEnter.append('text')
+                        .attr('class', 'expand-indicator')
+                        .attr('text-anchor', 'middle')
+                        .attr('dy', '.35em')
+                        .style('font-family', 'FontAwesome, sans-serif')
+                        .style('font-size', '10px')
+                        .style('fill', 'rgb(15, 20, 26)')
+                        .style('pointer-events', 'none')
+                        .text(d => d._children ? '+' : d.children ? '−' : '');
+
+                    // Merge enter and update selections
+                    const nodeUpdate = nodeEnter.merge(node);
+
+                    nodeUpdate.transition()
+                        .duration(750)
+                        .attr('transform', d => `translate(${d.y},${d.x})`)
+                        .style('opacity', 1);
+
+                    nodeUpdate.select('circle')
+                        .transition()
+                        .duration(750)
+                        .attr('r', d => {
+                            if (d.depth === 0) return 25;      // Organization
+                            if (d.depth === 1) return 20;      // Account
+                            if (d.depth === 2) return 15;      // Region
+                            if (d.depth === 3) return 12;      // Service
+                            return 8;                           // Individual Check
+                        })
+                        .style('fill', d => getNodeColor(d.data))
+                        .style('stroke', 'rgb(15, 20, 26)');
+
+                    nodeUpdate.select('.expand-indicator')
+                        .text(d => d._children ? '+' : d.children ? '−' : '');
+
+                    // Remove exiting nodes
+                    const nodeExit = node.exit().transition()
+                        .duration(750)
+                        .attr('transform', d => `translate(${source.y},${source.x})`)
+                        .style('opacity', 0)
+                        .remove();
+
+                    nodeExit.select('circle')
+                        .attr('r', 1e-6);
+
+                    // Update links
+                    const link = g.selectAll('path.link')
+                        .data(links, d => d.id);
+
+                    const linkEnter = link.enter().insert('path', 'g')
+                        .attr('class', 'link')
+                        .style('fill', 'none')
+                        .style('stroke', '#ccc')
+                        .style('stroke-width', '2px')
+                        .style('stroke-opacity', 0.6)
+                        .attr('d', d => {
+                            const o = { x: source.x0 || 0, y: source.y0 || 0 };
+                            return diagonal(o, o);
+                        });
+
+                    const linkUpdate = linkEnter.merge(link);
+
+                    linkUpdate.transition()
+                        .duration(750)
+                        .attr('d', d => diagonal(d, d.parent));
+
+                    const linkExit = link.exit().transition()
+                        .duration(750)
+                        .attr('d', d => {
+                            const o = { x: source.x, y: source.y };
+                            return diagonal(o, o);
+                        })
+                        .remove();
+
+                    // Store old positions for transition
+                    nodes.forEach(d => {
+                        d.x0 = d.x;
+                        d.y0 = d.y;
+                    });
+
+                    // Add hover tooltips
+                    nodeUpdate.on('mouseover', function (event, d) {
+                        const tooltip = d3.select('body').append('div')
+                            .attr('class', 'mindmap-tooltip')
+                            .style('position', 'absolute')
+                            .style('background', 'rgba(0,0,0,0.8)')
+                            .style('color', 'white')
+                            .style('padding', '10px')
+                            .style('border-radius', '5px')
+                            .style('font-size', '12px')
+                            .style('pointer-events', 'none')
+                            .style('z-index', '1000')
+                            .style('opacity', 0);
+
+                        let tooltipContent = `<strong>${d.data.name}</strong><br/>`;
+
+                        // Individual check tooltip
+                        if (d.data.status) {
+                            tooltipContent += `Check ID: ${d.data.checkId}<br/>`;
+                            if (d.data.title) {
+                                tooltipContent += `Title: ${d.data.title}<br/>`;
+                            }
+                            tooltipContent += `Status: <span style="color: ${d.data.status === 'PASS' ? '#28a745' : '#dc3545'}">${d.data.status}</span>`;
+                        } else {
+                            // Aggregate tooltip for higher levels
+                            tooltipContent += `Total Checks: ${d.data.total || 0}<br/>`;
+                            tooltipContent += `Passed: <span style="color: #28a745">${d.data.pass || 0}</span><br/>`;
+                            tooltipContent += `Failed: <span style="color: #dc3545">${d.data.fail || 0}</span><br/>`;
+                            if (d.data.total) {
+                                tooltipContent += `Success Rate: ${Math.round((d.data.pass / d.data.total) * 100)}%`;
+                            }
+                        }
+
+                        tooltip.html(tooltipContent)
+                            .style('left', (event.pageX + 10) + 'px')
+                            .style('top', (event.pageY - 10) + 'px')
+                            .transition()
+                            .duration(200)
+                            .style('opacity', 1);
+                    })
+                        .on('mouseout', function () {
+                            d3.selectAll('.mindmap-tooltip').remove();
+                        });
+                }
+
+                // Toggle children on click
+                function click(event, d) {
+                    if (d.children) {
+                        d._children = d.children;
+                        d.children = null;
+                    } else {
+                        d.children = d._children;
+                        d._children = null;
+                    }
+                    update(d);
+                }
+
+                // Diagonal path generator
+                function diagonal(s, d) {
+                    const path = `M ${s.y} ${s.x}
+                        C ${(s.y + d.y) / 2} ${s.x},
+                          ${(s.y + d.y) / 2} ${d.x},
+                          ${d.y} ${d.x}`;
+                    return path;
+                }
+            }
+
+            // Process data for mindmap
+            function processData(data) {
+                // Determine root node name from organization info
+                const firstRecord = data[0] || {};
+                const rootName = firstRecord.account_organization_name || firstRecord.account_organization_uid || 'AWS Organization';
+
+                const orgStructure = {
+                    name: rootName,
+                    children: [],
+                    pass: 0,
+                    fail: 0,
+                    total: 0
+                };
+                const accountMap = {};
+
+                // Group data by account
+                data.forEach(record => {
+                    const accountId = record.account_uid;
+                    const accountName = record.account_name || '';
+                    const region = record.region;
+                    const service = record.service_name;
+                    const status = record.status;
+                    const checkId = record.check_id;
+                    const title = record.check_title;
+
+                    if (!accountId || !region || !service || !status || !checkId) return;
+
+                    if (!accountMap[accountId]) {
+                        accountMap[accountId] = {
+                            id: accountId,
+                            name: accountName,
+                            regions: {},
+                            pass: 0,
+                            fail: 0,
+                            total: 0
+                        };
+                    }
+
+                    if (!accountMap[accountId].regions[region]) {
+                        accountMap[accountId].regions[region] = {
+                            name: region,
+                            services: {},
+                            pass: 0,
+                            fail: 0,
+                            total: 0
+                        };
+                    }
+
+                    if (!accountMap[accountId].regions[region].services[service]) {
+                        accountMap[accountId].regions[region].services[service] = {
+                            name: service,
+                            checks: {},
+                            pass: 0,
+                            fail: 0,
+                            total: 0
+                        };
+                    }
+
+                    // Create unique key for each check
+                    const checkKey = `${checkId}`;
+                    if (!accountMap[accountId].regions[region].services[service].checks[checkKey]) {
+                        accountMap[accountId].regions[region].services[service].checks[checkKey] = {
+                            name: title || checkId,
+                            checkId: checkId,
+                            title: title,
+                            status: status,
+                            pass: 0,
+                            fail: 0,
+                            total: 0
+                        };
+                    }
+
+                    // Update counts at all levels
+                    const checkStats = accountMap[accountId].regions[region].services[service].checks[checkKey];
+                    const serviceStats = accountMap[accountId].regions[region].services[service];
+                    const regionStats = accountMap[accountId].regions[region];
+                    const accountStats = accountMap[accountId];
+
+                    checkStats.total++;
+                    serviceStats.total++;
+                    regionStats.total++;
+                    accountStats.total++;
+                    orgStructure.total++;
+
+                    if (status === 'PASS') {
+                        checkStats.pass++;
+                        serviceStats.pass++;
+                        regionStats.pass++;
+                        accountStats.pass++;
+                        orgStructure.pass++;
+                    } else {
+                        checkStats.fail++;
+                        serviceStats.fail++;
+                        regionStats.fail++;
+                        accountStats.fail++;
+                        orgStructure.fail++;
+                    }
+                });
+
+                // Build tree structure
+                Object.values(accountMap).forEach(account => {
+                    const accountDisplayName = account.name ? `${account.name} (${account.id})` : account.id;
+                    const accountNode = {
+                        name: accountDisplayName,
+                        pass: account.pass,
+                        fail: account.fail,
+                        total: account.total,
+                        children: []
+                    };
+
+                    Object.values(account.regions).forEach(region => {
+                        const regionNode = {
+                            name: region.name,
+                            pass: region.pass,
+                            fail: region.fail,
+                            total: region.total,
+                            children: []
+                        };
+
+                        Object.values(region.services).forEach(service => {
+                            const serviceNode = {
+                                name: service.name,
+                                pass: service.pass,
+                                fail: service.fail,
+                                total: service.total,
+                                children: []
+                            };
+
+                            // Add individual checks as the deepest level
+                            Object.values(service.checks).forEach(check => {
+                                serviceNode.children.push({
+                                    name: check.name,
+                                    checkId: check.checkId,
+                                    title: check.title,
+                                    status: check.status,
+                                    pass: check.pass,
+                                    fail: check.fail,
+                                    total: check.total
+                                });
+                            });
+
+                            regionNode.children.push(serviceNode);
+                        });
+
+                        accountNode.children.push(regionNode);
+                    });
+
+                    orgStructure.children.push(accountNode);
+                });
+
+                return orgStructure;
+            }
+
+            // Get node color based on pass/fail ratio
+            function getNodeColor(data) {
+                if (!data.total) return '#ccc';
+
+                // Handle individual checks (they have a status property)
+                if (data.status) {
+                    return data.status === 'PASS' ? '#1E8900' : '#D13212';
+                }
+
+                // Use consistent pass/fail color scheme for all aggregate nodes
+                const failRatio = data.fail / data.total;
+
+                // Status colors for all nodes (accounts, services, regions)
+                if (failRatio === 0) return '#1E8900'; // All pass - green
+                if (failRatio < 0.5) return '#FF9900'; // Some fail - orange
+                return '#D13212'; // Most fail - red
+            }
+
+            // Sort table
+            const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, informational: 4 };
+
+            function sortTable(column) {
+                if (sortColumn === column) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortColumn = column;
+                    sortDirection = 'asc';
+                }
+
+                filteredData.sort((a, b) => {
+                    let aVal = a[column] || '';
+                    let bVal = b[column] || '';
+
+                    // Special handling for severity column - sort by severity order
+                    if (column === 'severity') {
+                        const aOrder = SEVERITY_ORDER[aVal.toLowerCase()] ?? 5;
+                        const bOrder = SEVERITY_ORDER[bVal.toLowerCase()] ?? 5;
+                        return sortDirection === 'asc' ? aOrder - bOrder : bOrder - aOrder;
+                    }
+
+                    if (sortDirection === 'asc') {
+                        return aVal.localeCompare(bVal);
+                    } else {
+                        return bVal.localeCompare(aVal);
+                    }
+                });
+
+                renderTable();
+            }
+
+            // Utility functions
+            function formatAccountDisplay(accountName, accountId) {
+                if (!accountId) return '';
+                if (!accountName || accountName.trim() === '') {
+                    return accountId;
+                }
+                return `${accountName} (${accountId})`;
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                return text.replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            function showTooltip(event, text) {
+                if (!text) return;
+                const tooltip = document.getElementById('tooltip');
+                tooltip.innerHTML = text;
+                tooltip.style.display = 'block';
+                tooltip.style.left = event.pageX + 10 + 'px';
+                tooltip.style.top = event.pageY + 10 + 'px';
+
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                }, 3000);
+            }
+
+            // Export to CSV
+            function exportToCSV() {
+                if (!allData.length) {
+                    alert('No data to export');
+                    return;
+                }
+
+                const headers = Object.keys(allData[0]);
+                let csvContent = headers.join(',') + '\n';
+
+                filteredData.forEach(row => {
+                    const values = headers.map(header => {
+                        const value = row[header] || '';
+                        return value.includes(',') || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value;
+                    });
+                    csvContent += values.join(',') + '\n';
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `satv2-filtered-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            // Copy Generative AI Prompt
+            function copyGenerativeAIPrompt() {
+                if (!allData.length) {
+                    alert('No data available to generate prompt');
+                    return;
+                }
+
+                // Use same base data as key actions (muted filter only)
+                const mutedFilter = document.getElementById('mutedFilter').value;
+                const baseData = mutedFilter ? allData.filter(row => row.muted === mutedFilter) : allData;
+
+                const criticalFailed = baseData.filter(r => r.status === 'FAIL' && (r.severity || '').toLowerCase() === 'critical');
+                const highFailed = baseData.filter(r => r.status === 'FAIL' && (r.severity || '').toLowerCase() === 'high');
+                const totalFailed = baseData.filter(r => r.status === 'FAIL').length;
+                const totalFindings = baseData.length;
+                const totalRegions = new Set(baseData.map(c => c.region)).size;
+                const totalAccounts = new Set(baseData.map(c => c.account_uid)).size;
+
+                // Build critical findings summary grouped by service
+                let criticalSummary = '';
+                if (criticalFailed.length > 0) {
+                    const byService = {};
+                    criticalFailed.forEach(r => {
+                        if (!byService[r.service_name]) byService[r.service_name] = { titles: new Set(), count: 0, regions: new Set(), accounts: new Set() };
+                        byService[r.service_name].titles.add(r.check_title);
+                        byService[r.service_name].count++;
+                        byService[r.service_name].regions.add(r.region);
+                        byService[r.service_name].accounts.add(r.account_uid);
+                    });
+                    Object.entries(byService).forEach(([svc, data]) => {
+                        criticalSummary += `\n### ${svc} (${data.count} findings across ${data.regions.size} regions, ${data.accounts.size} accounts)\n`;
+                        data.titles.forEach(t => { criticalSummary += `- ${t}\n`; });
+                    });
+                }
+
+                // Build high findings summary grouped by service
+                let highSummary = '';
+                if (highFailed.length > 0) {
+                    const byService = {};
+                    highFailed.forEach(r => {
+                        if (!byService[r.service_name]) byService[r.service_name] = { titles: new Set(), count: 0, regions: new Set(), accounts: new Set() };
+                        byService[r.service_name].titles.add(r.check_title);
+                        byService[r.service_name].count++;
+                        byService[r.service_name].regions.add(r.region);
+                        byService[r.service_name].accounts.add(r.account_uid);
+                    });
+                    Object.entries(byService).forEach(([svc, data]) => {
+                        highSummary += `\n### ${svc} (${data.count} findings across ${data.regions.size} regions, ${data.accounts.size} accounts)\n`;
+                        data.titles.forEach(t => { highSummary += `- ${t}\n`; });
+                    });
+                }
+
+                const prompt = `# SATv2 Security Assessment — Remediation Quick Wins
+
+## Context
+I ran a SATv2 (Prowler) security assessment across my AWS environment. I need you to help me identify the highest-impact quick wins to reduce risk, starting with critical findings then high.
+
+## Environment Summary
+- **Total Findings:** ${totalFindings}
+- **Total Failed:** ${totalFailed}
+- **Critical Failures:** ${criticalFailed.length}
+- **High Failures:** ${highFailed.length}
+- **Accounts Scanned:** ${totalAccounts}
+- **Regions Scanned:** ${totalRegions}
+
+## Critical Severity Failures (${criticalFailed.length})
+${criticalSummary || 'None'}
+
+## High Severity Failures (${highFailed.length})
+${highSummary || 'None'}
+
+## What I Need
+
+1. **Critical Quick Wins**: From the critical findings above, identify the top 3-5 that are easiest to fix and carry the most risk. For each, give me a concise remediation step I can act on immediately.
+
+2. **High Quick Wins**: Same for the high findings — top 3-5 quick wins that reduce the most risk with the least effort.
+
+3. **Risk Context**: For each recommendation, briefly explain what an attacker could exploit if this stays unfixed.
+
+4. **What to Tackle Later**: Group the remaining findings into themes (e.g., "IAM hygiene", "encryption at rest", "logging gaps") so I can plan follow-up work.
+
+5. **Native Services**: If native AWS services can solve some of these findings at scale, recommend how to use them.
+
+Keep it concise and actionable. I'll share this with my security and cloud ops teams.`;
+
+                // Copy to clipboard
+                navigator.clipboard.writeText(prompt).then(() => {
+                    const buttons = document.querySelectorAll('button');
+                    let targetButton = null;
+
+                    buttons.forEach(button => {
+                        if (button.textContent.includes('Copy generative AI prompt')) {
+                            targetButton = button;
+                        }
+                    });
+
+                    if (targetButton) {
+                        const originalHTML = targetButton.innerHTML;
+                        const originalBgColor = targetButton.style.backgroundColor;
+
+                        targetButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" style="width: 16px; height: 16px; fill: currentColor; margin-right: 8px;"><path d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>Copied!`;
+                        targetButton.style.backgroundColor = '#28a745';
+
+                        setTimeout(() => {
+                            targetButton.innerHTML = originalHTML;
+                            targetButton.style.backgroundColor = originalBgColor;
+                        }, 2000);
+                    }
+                }).catch(err => {
+                    console.error('Failed to copy to clipboard:', err);
+                    alert('Failed to copy to clipboard. Please try again.');
+                });
+            }
+
+            // Fullscreen Mindmap Functions
+            function openFullscreenMindmap() {
+                if (!allData || allData.length === 0) {
+                    alert('No data available for mindmap');
+                    return;
+                }
+
+                const modal = document.getElementById('fullscreenModal');
+                modal.classList.add('active');
+
+                // Populate fullscreen filters with current data
+                populateFullscreenFilters();
+
+                // Copy current filter values to fullscreen filters
+                syncFiltersToFullscreen();
+
+                // Create fullscreen mindmap
+                createFullscreenMindmap();
+
+                // Add event listeners for fullscreen filters
+                addFullscreenFilterListeners();
+
+                // Prevent body scrolling when modal is open
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeFullscreenMindmap() {
+                const modal = document.getElementById('fullscreenModal');
+                modal.classList.remove('active');
+
+                // Restore body scrolling
+                document.body.style.overflow = 'auto';
+
+                // Clear the fullscreen mindmap container
+                document.getElementById('fullscreenMindmapContainer').innerHTML = '';
+            }
+
+            function populateFullscreenFilters() {
+                const services = [...new Set(allData.map(row => row.service_name))].sort();
+                const regions = [...new Set(allData.map(row => row.region))].sort();
+
+                const serviceFilter = document.getElementById('fullscreenServiceFilter');
+                const regionFilter = document.getElementById('fullscreenRegionFilter');
+
+                // Clear existing options (except first)
+                serviceFilter.innerHTML = '<option value="">All Services</option>';
+                regionFilter.innerHTML = '<option value="">All Regions</option>';
+
+                services.forEach(service => {
+                    if (service) {
+                        const option = document.createElement('option');
+                        option.value = service;
+                        option.textContent = service;
+                        serviceFilter.appendChild(option);
+                    }
+                });
+
+                regions.forEach(region => {
+                    if (region) {
+                        const option = document.createElement('option');
+                        option.value = region;
+                        option.textContent = region;
+                        regionFilter.appendChild(option);
+                    }
+                });
+            }
+
+            function syncFiltersToFullscreen() {
+                // Copy current mindmap filter values to fullscreen filters
+                document.getElementById('fullscreenStatusFilter').value = document.getElementById('mindmapStatusFilter').value;
+                document.getElementById('fullscreenSeverityFilter').value = document.getElementById('mindmapSeverityFilter').value;
+                document.getElementById('fullscreenServiceFilter').value = document.getElementById('mindmapServiceFilter').value;
+                document.getElementById('fullscreenRegionFilter').value = document.getElementById('mindmapRegionFilter').value;
+                document.getElementById('fullscreenSearchBox').value = document.getElementById('mindmapSearchBox').value;
+            }
+
+            function addFullscreenFilterListeners() {
+                document.getElementById('fullscreenStatusFilter').addEventListener('change', createFullscreenMindmap);
+                document.getElementById('fullscreenSeverityFilter').addEventListener('change', createFullscreenMindmap);
+                document.getElementById('fullscreenServiceFilter').addEventListener('change', createFullscreenMindmap);
+                document.getElementById('fullscreenRegionFilter').addEventListener('change', createFullscreenMindmap);
+                document.getElementById('fullscreenSearchBox').addEventListener('input', createFullscreenMindmap);
+            }
+
+            function createFullscreenMindmap() {
+                const container = document.getElementById('fullscreenMindmapContainer');
+                container.innerHTML = '';
+
+                if (!allData || allData.length === 0) {
+                    container.innerHTML = '<div style="padding:20px;text-align:center;color:white;">No data available for mindmap</div>';
+                    return;
+                }
+
+                // Apply fullscreen filters to data
+                const statusFilter = document.getElementById('fullscreenStatusFilter')?.value || '';
+                const severityFilter = document.getElementById('fullscreenSeverityFilter')?.value || '';
+                const serviceFilter = document.getElementById('fullscreenServiceFilter')?.value || '';
+                const regionFilter = document.getElementById('fullscreenRegionFilter')?.value || '';
+                const searchTerm = document.getElementById('fullscreenSearchBox')?.value.toLowerCase() || '';
+
+                const filteredData = allData.filter(row => {
+                    return (!statusFilter || row.status === statusFilter) &&
+                        (!severityFilter || (row.severity || '').toUpperCase() === severityFilter) &&
+                        (!serviceFilter || row.service_name === serviceFilter) &&
+                        (!regionFilter || row.region === regionFilter) &&
+                        (!searchTerm ||
+                            (row.check_id && row.check_id.toLowerCase().includes(searchTerm)) ||
+                            (row.check_title && row.check_title.toLowerCase().includes(searchTerm)) ||
+                            (row.description && row.description.toLowerCase().includes(searchTerm)) ||
+                            (row.resource_uid && row.resource_uid.toLowerCase().includes(searchTerm)) ||
+                            (row.remediation_recommendation_text && row.remediation_recommendation_text.toLowerCase().includes(searchTerm)));
+                });
+
+                if (filteredData.length === 0) {
+                    container.innerHTML = '<div style="padding:20px;text-align:center;color:white;">No data matches the current filters</div>';
+                    return;
+                }
+
+                // Process filtered data for mindmap
+                const orgData = processData(filteredData);
+
+                // Create enhanced D3 visualization for fullscreen
+                const containerRect = container.getBoundingClientRect();
+                const width = containerRect.width || window.innerWidth;
+                const height = containerRect.height || window.innerHeight - 200; // Account for header and filters
+                const margin = { top: 40, right: 40, bottom: 40, left: 40 };
+
+                const svg = d3.select('#fullscreenMindmapContainer')
+                    .append('svg')
+                    .attr('width', '100%')
+                    .attr('height', '100%')
+                    .attr('viewBox', `0 0 ${width} ${height}`)
+                    .style('background', 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)')
+                    .style('border-radius', '0');
+
+                const g = svg.append('g')
+                    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+                // Add zoom and pan functionality with better controls for fullscreen
+                const zoom = d3.zoom()
+                    .scaleExtent([0.3, 5])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // Create tree layout with spacing similar to minimized mode
+                const tree = d3.tree()
+                    .size([height - margin.top - margin.bottom, width - margin.left - margin.right])
+                    .separation((a, b) => {
+                        // Adjust vertical separation based on node depth to prevent overlapping
+                        if (a.parent === b.parent) {
+                            // Same parent - increase spacing for higher levels that have more children
+                            if (a.depth <= 1) return 2.5;      // Account level - more space
+                            if (a.depth === 2) return 2.0;     // Region level - moderate space
+                            if (a.depth === 3) return 1.75;    // Service level - moderate space
+                            return 1.25;                        // Individual checks - close together
+                        } else {
+                            // Different parents - more spacing for higher levels
+                            if (a.depth <= 1) return 3.0;      // Account level
+                            if (a.depth === 2) return 2.5;     // Region level
+                            if (a.depth === 3) return 2.0;     // Service level
+                            return 1.5;                         // Individual checks
+                        }
+                    });
+
+                const root = d3.hierarchy(orgData);
+
+                // Collapse account nodes by default (depth 1 and deeper) - same as minimized mode
+                root.descendants().forEach(d => {
+                    if (d.depth >= 1) {
+                        d._children = d.children;
+                        d.children = null;
+                    }
+                });
+
+                let i = 0;
+                updateFullscreen(root);
+
+                function updateFullscreen(source) {
+                    const treeData = tree(root);
+                    const nodes = treeData.descendants();
+                    const links = treeData.descendants().slice(1);
+
+                    // Update node positions with closer horizontal levels
+                    const maxDepth = Math.max(...nodes.map(d => d.depth));
+                    const horizontalSpacing = maxDepth > 0 ? (width - margin.left - margin.right) / maxDepth : 200;
+                    nodes.forEach(d => {
+                        d.y = d.depth * Math.max(horizontalSpacing * 0.7, 100); // Reduce level spacing by 30%
+                    });
+
+                    // Update nodes (similar to regular mindmap but with larger sizes)
+                    const node = g.selectAll('g.node')
+                        .data(nodes, d => d.id || (d.id = ++i));
+
+                    const nodeEnter = node.enter().append('g')
+                        .attr('class', 'node')
+                        .attr('transform', d => `translate(${source.y0 || 0},${source.x0 || 0})`)
+                        .style('opacity', 0);
+
+                    // Add circles for nodes (slightly larger than minimized but not too big)
+                    nodeEnter.append('circle')
+                        .attr('r', 1e-6)
+                        .style('fill', d => getNodeColor(d.data))
+                        .style('stroke', 'rgb(15, 20, 26)')
+                        .style('stroke-width', '2px') // Same as minimized
+                        .style('cursor', 'pointer')
+                        .style('filter', 'drop-shadow(2px 2px 4px rgba(0,0,0,0.2))') // Same as minimized
+                        .on('click', clickFullscreen);
+
+                    // Add labels (slightly larger than minimized for better readability)
+                    nodeEnter.append('text')
+                        .attr('dy', '.35em')
+                        .attr('x', d => {
+                            // Increase padding based on larger circle sizes in fullscreen
+                            let padding;
+                            if (d.depth === 0) padding = 38;      // Organization (circle r=28 + 10px padding)
+                            else if (d.depth === 1) padding = 32; // Account (circle r=22 + 10px padding)
+                            else if (d.depth === 2) padding = 27; // Region (circle r=17 + 10px padding)
+                            else if (d.depth === 3) padding = 24; // Service (circle r=14 + 10px padding)
+                            else padding = 20;                     // Individual checks (circle r=10 + 10px padding)
+
+                            return d.children || d._children ? -padding : padding;
+                        })
+                        .style('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                        .style('font-family', 'Segoe UI, sans-serif')
+                        .style('font-size', d => {
+                            // Slightly larger than minimized for better readability
+                            if (d.depth === 0) return '18px';      // vs 16px in minimized
+                            if (d.depth === 1) return '16px';      // vs 14px in minimized
+                            if (d.depth === 2) return '14px';      // vs 12px in minimized
+                            if (d.depth === 3) return '13px';      // vs 11px in minimized
+                            return '11px';                          // vs 9px in minimized
+                        })
+                        .style('font-weight', d => d.depth <= 1 ? 'bold' : 'normal')
+                        .style('fill', '#333')
+                        .text(d => {
+                            let name = d.data.name;
+
+                            // Add pass/fail counts in parentheses for nodes with totals
+                            if (d.data.total) {
+                                name += ` (${d.data.pass}/${d.data.total})`;
+                            }
+
+                            // Use same truncation lengths as minimized mode, but allow full titles for individual checks
+                            let maxLength;
+                            if (d.depth === 0) maxLength = 40; // Increased to accommodate counts
+                            else if (d.depth === 1) maxLength = 35;
+                            else if (d.depth === 2) maxLength = 30;
+                            else if (d.depth === 3) maxLength = 25;
+                            else return name; // Individual checks - show full title with counts
+
+                            if (name.length > maxLength) {
+                                return name.substring(0, maxLength - 3) + '...';
+                            }
+                            return name;
+                        });
+
+                    // Add expand/collapse indicators
+                    nodeEnter.append('text')
+                        .attr('class', 'expand-indicator')
+                        .attr('text-anchor', 'middle')
+                        .attr('dy', '.35em')
+                        .style('font-family', 'FontAwesome, sans-serif')
+                        .style('font-size', '10px') // Same as minimized
+                        .style('fill', 'rgb(15, 20, 26)')
+                        .style('pointer-events', 'none')
+                        .text(d => d._children ? '+' : d.children ? '−' : '');
+
+                    // Merge and update
+                    const nodeUpdate = nodeEnter.merge(node);
+
+                    nodeUpdate.transition()
+                        .duration(750)
+                        .attr('transform', d => `translate(${d.y},${d.x})`)
+                        .style('opacity', 1);
+
+                    nodeUpdate.select('circle')
+                        .transition()
+                        .duration(750)
+                        .attr('r', d => {
+                            // Slightly larger than minimized but not too big
+                            if (d.depth === 0) return 28;      // vs 25 in minimized
+                            if (d.depth === 1) return 22;      // vs 20 in minimized
+                            if (d.depth === 2) return 17;      // vs 15 in minimized
+                            if (d.depth === 3) return 14;      // vs 12 in minimized
+                            return 10;                          // vs 8 in minimized
+                        })
+                        .style('fill', d => getNodeColor(d.data))
+                        .style('stroke', 'rgb(15, 20, 26)');
+
+                    nodeUpdate.select('.expand-indicator')
+                        .text(d => d._children ? '+' : d.children ? '−' : '');
+
+                    // Remove exiting nodes
+                    const nodeExit = node.exit().transition()
+                        .duration(750)
+                        .attr('transform', d => `translate(${source.y},${source.x})`)
+                        .style('opacity', 0)
+                        .remove();
+
+                    nodeExit.select('circle').attr('r', 1e-6);
+
+                    // Update links
+                    const link = g.selectAll('path.link')
+                        .data(links, d => d.id);
+
+                    const linkEnter = link.enter().insert('path', 'g')
+                        .attr('class', 'link')
+                        .style('fill', 'none')
+                        .style('stroke', '#ccc')
+                        .style('stroke-width', '2px') // Same as minimized
+                        .style('stroke-opacity', 0.6)
+                        .attr('d', d => {
+                            const o = { x: source.x0 || 0, y: source.y0 || 0 };
+                            return diagonal(o, o);
+                        });
+
+                    const linkUpdate = linkEnter.merge(link);
+                    linkUpdate.transition()
+                        .duration(750)
+                        .attr('d', d => diagonal(d, d.parent));
+
+                    const linkExit = link.exit().transition()
+                        .duration(750)
+                        .attr('d', d => {
+                            const o = { x: source.x, y: source.y };
+                            return diagonal(o, o);
+                        })
+                        .remove();
+
+                    // Store old positions
+                    nodes.forEach(d => {
+                        d.x0 = d.x;
+                        d.y0 = d.y;
+                    });
+
+                    // Add enhanced tooltips for fullscreen
+                    nodeUpdate.on('mouseover', function (event, d) {
+                        const tooltip = d3.select('body').append('div')
+                            .attr('class', 'mindmap-tooltip')
+                            .style('position', 'absolute')
+                            .style('background', 'rgba(0,0,0,0.9)')
+                            .style('color', 'white')
+                            .style('padding', '15px')
+                            .style('border-radius', '8px')
+                            .style('font-size', '14px')
+                            .style('pointer-events', 'none')
+                            .style('z-index', '10000')
+                            .style('max-width', '400px')
+                            .style('opacity', 0);
+
+                        let tooltipContent = `<strong>${d.data.name}</strong><br/>`;
+
+                        if (d.data.status) {
+                            tooltipContent += `Check ID: ${d.data.checkId}<br/>`;
+                            if (d.data.title) {
+                                tooltipContent += `Title: ${d.data.title}<br/>`;
+                            }
+                            tooltipContent += `Status: <span style="color: ${d.data.status === 'PASS' ? '#28a745' : '#dc3545'}">${d.data.status}</span>`;
+                        } else {
+                            tooltipContent += `Total Checks: ${d.data.total || 0}<br/>`;
+                            tooltipContent += `Passed: <span style="color: #28a745">${d.data.pass || 0}</span><br/>`;
+                            tooltipContent += `Failed: <span style="color: #dc3545">${d.data.fail || 0}</span><br/>`;
+                            if (d.data.total) {
+                                tooltipContent += `Success Rate: ${Math.round((d.data.pass / d.data.total) * 100)}%`;
+                            }
+                        }
+
+                        tooltip.html(tooltipContent)
+                            .style('left', (event.pageX + 15) + 'px')
+                            .style('top', (event.pageY - 15) + 'px')
+                            .transition()
+                            .duration(200)
+                            .style('opacity', 1);
+                    })
+                        .on('mouseout', function () {
+                            d3.selectAll('.mindmap-tooltip').remove();
+                        });
+                }
+
+                function clickFullscreen(event, d) {
+                    if (d.children) {
+                        d._children = d.children;
+                        d.children = null;
+                    } else {
+                        d.children = d._children;
+                        d._children = null;
+                    }
+                    updateFullscreen(d);
+                }
+
+                function diagonal(s, d) {
+                    const path = `M ${s.y} ${s.x}
+                        C ${(s.y + d.y) / 2} ${s.x},
+                          ${(s.y + d.y) / 2} ${d.x},
+                          ${d.y} ${d.x}`;
+                    return path;
+                }
+            }
+
+            // Close modal when clicking outside or pressing Escape
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeFullscreenMindmap();
+                }
+            });
+
+            document.getElementById('fullscreenModal').addEventListener('click', function (event) {
+                if (event.target === this) {
+                    closeFullscreenMindmap();
+                }
+            });
+        </script>
+</body>
+
+</html>
