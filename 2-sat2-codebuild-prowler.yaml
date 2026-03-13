@@ -143,6 +143,138 @@ Mappings:
       CodeBuildComputeType: BUILD_GENERAL1_XLARGE
 
 Resources:
+  #Custom resource to safely create IAM roles only if they don't already exist
+  RoleCheckerLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub ${AWS::AccountId}
+      Path: /
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ManageProwlerRoles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRolePolicies
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerMemberRole'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/ProwlerMemberRole'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/ProwlerCodeBuildRole'
+
+  RoleCheckerLambdaLogGroup:
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: CloudWatch Logs protects data at rest using encryption.
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${RoleCheckerLambda}'
+      RetentionInDays: 7
+
+  RoleCheckerLambda:
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: The RoleCheckerLambdaRole gives Lambda access to write CloudWatch logs.
+          - id: W89
+            reason: Lambda is not deployed inside of a VPC.
+          - id: W92
+            reason: Reserved concurrent executions is not set.
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt RoleCheckerLambdaRole.Arn
+      Timeout: 120
+      Runtime: python3.10
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          import time
+          from botocore.exceptions import ClientError
+
+          iam = boto3.client('iam')
+
+          def lambda_handler(event, context):
+            print(json.dumps(event))
+            props = event['ResourceProperties']
+            role_name = props['RoleName']
+            request_type = event['RequestType']
+
+            try:
+              if request_type == 'Create':
+                try:
+                  iam.get_role(RoleName=role_name)
+                  print(f"Role {role_name} already exists, skipping creation.")
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {'RoleExists': 'true'}, role_name)
+                  return
+                except iam.exceptions.NoSuchEntityException:
+                  pass
+
+                trust_policy = json.loads(props['AssumeRolePolicyDocument'])
+                iam.create_role(
+                  Path=props.get('Path', '/'),
+                  RoleName=role_name,
+                  AssumeRolePolicyDocument=json.dumps(trust_policy)
+                )
+                for arn in props.get('ManagedPolicyArns', []):
+                  iam.attach_role_policy(RoleName=role_name, PolicyArn=arn)
+                for p in props.get('InlinePolicies', []):
+                  iam.put_role_policy(RoleName=role_name, PolicyName=p['PolicyName'], PolicyDocument=json.dumps(p['PolicyDocument']))
+                # Wait for IAM propagation
+                time.sleep(15)
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {'RoleExists': 'false'}, role_name)
+
+              elif request_type == 'Delete':
+                try:
+                  # Detach managed policies
+                  paginator = iam.get_paginator('list_attached_role_policies')
+                  for page in paginator.paginate(RoleName=role_name):
+                    for p in page['AttachedPolicies']:
+                      iam.detach_role_policy(RoleName=role_name, PolicyArn=p['PolicyArn'])
+                  # Delete inline policies
+                  paginator = iam.get_paginator('list_role_policies')
+                  for page in paginator.paginate(RoleName=role_name):
+                    for name in page['PolicyNames']:
+                      iam.delete_role_policy(RoleName=role_name, PolicyName=name)
+                  iam.delete_role(RoleName=role_name)
+                except iam.exceptions.NoSuchEntityException:
+                  print(f"Role {role_name} does not exist, nothing to delete.")
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, role_name)
+
+              else:  # Update
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, role_name)
+
+            except Exception as e:
+              print(f"Error: {e}")
+              cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)}, role_name)
+
   #This is the role that CodeBuild assumes to perform the Prowler scan
   ProwlerIntegrationCodeBuildRole:
     Metadata:
@@ -155,27 +287,35 @@ Resources:
           - id: W76
             reason: SPCM for IAM policy is higher than 25 due to managed polices, and additional polices. Each section of the role has a comment with the Prowler documentation describing the need for the privileges.
     Condition: CreateProwlerRole
-    Type: 'AWS::IAM::Role'
+    Type: 'Custom::IAMRoleIfNotExists'
     Properties:
+      ServiceToken: !GetAtt RoleCheckerLambda.Arn
       Path: '/service-role/'
       RoleName: ProwlerMemberRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
-            Action:
-              - 'sts:AssumeRole'
-            Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole
+      AssumeRolePolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:PrincipalArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole"
+                }
+              }
+            }
+          ]
+        }
       ManagedPolicyArns:
         # Prowler requires these managed polices to perform all the checks
         # https://docs.prowler.cloud/en/latest/getting-started/requirements/
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/SecurityAudit'
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess'
-      Policies:
+      InlinePolicies:
         # Prowler requires these additional read-only permissions. They are documented in the Prowler documentation.
         # https://github.com/prowler-cloud/prowler/blob/master/permissions/prowler-additions-policy.json
         - PolicyName: ProwlerAdditions
@@ -380,22 +520,30 @@ Resources:
             reason: ListAccounts does not support resource types.
           - id: W28
             reason: This role is given an explicit name to further restrict the more permissive ProwlerMemberRole to only be assumed by this role.
-    Type: AWS::IAM::Role
+    Type: 'Custom::IAMRoleIfNotExists'
     Properties:
+      ServiceToken: !GetAtt RoleCheckerLambda.Arn
       Path: '/service-role/'
       RoleName: ProwlerCodeBuildRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Action: 'sts:AssumeRole'
-            Effect: Allow
-            Principal:
-              Service:
-                - codebuild.amazonaws.com
-            Condition:
-              StringEquals:
-                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerCodeBuild'
-      Policies:
+      AssumeRolePolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceArn": "arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/ProwlerCodeBuild"
+                }
+              }
+            }
+          ]
+        }
+      InlinePolicies:
         - PolicyName: LogGroup
           PolicyDocument:
             Version: '2012-10-17'
@@ -434,6 +582,7 @@ Resources:
                 Resource: '*'
 
   ProwlerCodeBuild:
+    DependsOn: ProwlerCodeBuildRole
     Metadata:
       cfn_nag:
         rules_to_suppress:
@@ -490,7 +639,7 @@ Resources:
               ]
             Type: PLAINTEXT
       Description: Run Prowler assessment
-      ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
+      ServiceRole: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole'
       TimeoutInMinutes: !Ref CodeBuildTimeout
       Artifacts:
         Type: NO_ARTIFACTS
@@ -725,7 +874,7 @@ Resources:
               Type: string
             - Name: account_uid
               Type: string
-            - Name: account_name
+            - Name: account_namse
               Type: string
             - Name: account_email
               Type: string
@@ -1255,11 +1404,9 @@ Resources:
               commands:
                 - echo "Uploading report to S3..."
                 - aws s3 cp SHIP_v3_Updated.pptx s3://$BUCKET_REPORT/reports/
-                - echo "Uploading html dashboard to S3..."
-                - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
                 - echo "Done!"
 
 Outputs:
   AccountID:
     Description: ID that Prowler is running from
-    Value: !GetAtt ProwlerCodeBuildRole.Arn
+    Value: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/ProwlerCodeBuildRole'
