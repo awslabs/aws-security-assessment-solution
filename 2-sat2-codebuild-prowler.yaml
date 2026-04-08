@@ -52,7 +52,7 @@ Parameters:
       - 'Basic'
       - 'Intermediate'
       - 'Full'
-    Default: 'Basic'
+    Default: 'Intermediate'
   ProwlerRole:
     Description: 'The role that Prowler should assume to perform the scan.'
     Type: String
@@ -73,12 +73,12 @@ Parameters:
     Type: String
     Default: ''
   Reporting:
-    Description: 'Set this to true if you want to summarize the Prowler reports using Amazon Athena. This is helpful when scanning multiple accounts.'
+    Description: 'Set this to true if you want to summarize the reports and use the dashboard. This is helpful when scanning multiple accounts.'
     Type: String
     AllowedValues:
       - 'true'
       - 'false'
-    Default: 'false'
+    Default: 'true'
   ConcurrentAccountScans:
     Description: 'For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three may incur additional costs.'
     Type: String
@@ -1253,8 +1253,6 @@ Resources:
                 - python report.py
             post_build:
               commands:
-                - echo "Uploading report to S3..."
-                - aws s3 cp SHIP_v3_Updated.pptx s3://$BUCKET_REPORT/reports/
                 - echo "Uploading html dashboard to S3..."
                 - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
                 - echo "Done!"
