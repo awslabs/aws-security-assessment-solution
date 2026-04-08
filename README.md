@@ -6,6 +6,8 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
 
 >Note: Prowler is not an AWS owned solution. Customers should independently review Prowler before running this solution. Any dependencies associated with Prowler should be kept up to date. This solution installs the latest version available from pip package installer.
 
+📕 For more in depth step-by-step instructions, visit module 2 in the [SHIP Workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3bd6e4da-265a-4c79-ab47-639b7ef23c9d/en-US/20-satv2).
+
 ## Table of Contents<!-- omit from toc -->
 - [Overview](#overview)
 - [Parameters](#parameters)
@@ -24,6 +26,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
     - [Step 2: Enable delegated administrator for AWS Organizations](#step-2-enable-delegated-administrator-for-aws-organizations)
     - [Step 3: Deploy the SATv2 solution](#step-3-deploy-the-satv2-solution)
 - [Review the results](#review-the-results)
+  - [SATv2 Dashboard (recommended)](#satv2-dashboard-recommended)
   - [Prowler Dashboard](#prowler-dashboard)
 - [Scan types](#scan-types)
   - [Basic Scan](#basic-scan)
@@ -48,27 +51,27 @@ Once the template is deployed, the CodeBuild project will run. The default asses
 ## Parameters
 SATv2 can be customized by updating the CloudFormation parameters. This section summarizes the available options and provides a link to the section with more information.
 
-| Parameter | Description | More information |
-| --- | --- | ---|
-| ProwlerScanType | Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions. | [Scan types](#scan-types)
-| MultiAccountScan | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions. | [Multi-account scan](#multi-account-scan)
-| Reporting | Set this to true if you want to summarize the Prowler reports into a single csv and create a presentation. This is helpful when scanning multiple accounts. | [Reporting Summary](#reporting-summary)
-| EmailAddress | Specify an address if you want to receive an email when the assessment completes. | [Notifications](#notifications)
+| Parameter                | Description                                                                                                                                                                                                                                                                                                                               | More information                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| ProwlerScanType          | Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions.                                                                                                                                  | [Scan types](#scan-types)                 |
+| MultiAccountScan         | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions.                                                                                                                        | [Multi-account scan](#multi-account-scan) |
+| Reporting                | Set this to true if you want to summarize the Prowler reports into a single csv. This is helpful when scanning multiple accounts.                                                                                                                                                                                                         | [Reporting Summary](#reporting-summary)   |
+| EmailAddress             | Specify an address if you want to receive an email when the assessment completes.                                                                                                                                                                                                                                                         | [Notifications](#notifications)           |
 | **Advanced Parameters**  |
-| ConcurrentAccountScans | For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three changes the size of the CodeBuild instance and may incur additional costs.
-| CodeBuildTimeout | Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours). |
-| MultiAccountListOverride | Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization. Ensure that you have set `MultiAccountScan` parameter above to true if you want to scan specific accounts. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | [Multi-account scan](#multi-account-scan)
-| ProwlerOptions | Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify. This can also be used to specify a single check. | [Full scan](#full-scan)
-| ProwlerRole | The role that Prowler should assume to perform the scan. Change this if you want to specify your own role with different permissions.
+| ConcurrentAccountScans   | For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three changes the size of the CodeBuild instance and may incur additional costs.                                                                                             |
+| CodeBuildTimeout         | Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).                                                                                                                                                                                                                                                              |
+| MultiAccountListOverride | Specify a space delimited list of accounts to scan. Leaving this blank will scan all accounts in your organization. Ensure that you have set `MultiAccountScan` parameter above to true if you want to scan specific accounts. If you can't provide delegated ListAccount access, you can provide the MultiAccountListOverride parameter. | [Multi-account scan](#multi-account-scan) |
+| ProwlerOptions           | Specify the parameters for Prowler. The --role and ARN will automatically be added to the end of the parameters you specify. This can also be used to specify a single check.                                                                                                                                                             | [Full scan](#full-scan)                   |
+| ProwlerRole              | The role that Prowler should assume to perform the scan. Change this if you want to specify your own role with different permissions.                                                                                                                                                                                                     |
 
 
 ## Deployment
 You can use this project to run Prowler across multiple accounts in an AWS Organization, or a single account. We provide instructions to use  AWS CloudShell or the AWS console. Choose an option to get started.
 
-|Deployment Type|AWS CloudShell|AWS console|
-| --- | --- | --- |
-| Single account | [Link](#aws-cloudshell) | [Link](#aws-console) |
-| Multi-account | [Link](#aws-cloudshell-1) | [Link](#aws-console-1) |
+| Deployment Type | AWS CloudShell            | AWS console            |
+| --------------- | ------------------------- | ---------------------- |
+| Single account  | [Link](#aws-cloudshell)   | [Link](#aws-console)   |
+| Multi-account   | [Link](#aws-cloudshell-1) | [Link](#aws-console-1) |
 
 
 ## Single account scan
@@ -348,7 +351,7 @@ Determine if you have delegated administrator or a resource policy that already 
 </details>
 
 ## Review the results
-After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv and presentation file in the /reports folder.
+After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv file in the /reports folder.
 
 If you didn't configure email alerts, you can monitor the progress from the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects).
 
@@ -371,6 +374,16 @@ To review the results, follow these steps.
 7. A new window will open with your report. You can use the filters to identify and prioritize the findings.
 
    ![Prowler findings](/img/prowler-findings.png)
+
+### SATv2 Dashboard (recommended)
+If you enabled reporting, a static html dashboard will be in the reporting folder.
+
+1. Select **satv2-dashboard.html** object, choose **Open**.
+2. Select the consolidated csv, choose **Actions**, **Share with a presigned URL**.
+    >Note: Do not share your presigned URL with anyone. A presigned URL uses security credentials to grant time-limited permission to download objects. The URL can be entered in a browser or used by a program to download the object. The credentials used by the presigned URL are those of the AWS user who generated the URL. For more information, review Sharing objects with presigned URLs.
+3. For **number of minutes**, enter **1**.
+4. Paste the URL into the satv2-dashboard.html page.
+5. Review an example dashboard output in [img/satv2-dashboard.png](/img/satv2-dashboard.png)
 
 ### Prowler Dashboard
 Prowler has a built in dashboard to review the results. To use the Prowler dashboard, Prowler must be installed locally and you must download the results of Prowler locally.
@@ -479,8 +492,6 @@ With or without the optional EmailAddress parameter set, you can view the progre
 ## Reporting Summary
 
 You can optionally enable reporting to summarize multiple Prowler scan csv files into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reports folder.
-
-The consolidated csv file will be used to create a SHIP HealthCheck presentation. Once the csv file is written to the bucket, an EventBridge rule runs a Lambda function that starts a CodeBuild job. The updated presentation is stored in the same S3 bucket in the /reports folder.
 
 If you specify an email address while reporting is enabled, you will get a second email when the Athena query is finished.
 
