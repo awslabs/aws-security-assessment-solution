@@ -544,7 +544,7 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 
 When deploying via the Console, enter your bucket name in the **ExistingBucketName** parameter field. Leave it empty to create a new bucket (default behavior).
 
->Note: The existing bucket must have versioning enabled and appropriate permissions for the CodeBuild role to write objects.
+>Note: The existing bucket must have appropriate permissions for the CodeBuild role to write objects.
 
 ## Frequently Asked Questions (FAQ)
 
