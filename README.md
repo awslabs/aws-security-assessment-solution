@@ -34,6 +34,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
   - [Full scan](#full-scan)
 - [Notifications](#notifications)
 - [Reporting Summary](#reporting-summary)
+- [Using an existing bucket](#using-an-existing-bucket)
 - [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [Clean Up](#clean-up)
 - [Security](#security)
@@ -57,6 +58,7 @@ SATv2 can be customized by updating the CloudFormation parameters. This section 
 | MultiAccountScan         | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions.                                                                                                                        | [Multi-account scan](#multi-account-scan) |
 | Reporting                | Set this to true if you want to summarize the Prowler reports into a single csv. This is helpful when scanning multiple accounts.                                                                                                                                                                                                         | [Reporting Summary](#reporting-summary)   |
 | EmailAddress             | Specify an address if you want to receive an email when the assessment completes.                                                                                                                                                                                                                                                         | [Notifications](#notifications)           |
+| ExistingBucketName       | Name of an existing S3 bucket to store scan results. Leave empty to create a new bucket. Useful for environments with SCPs that restrict bucket creation.                                                                                                                                                                                 | [Using an existing bucket](#using-an-existing-bucket) |
 | **Advanced Parameters**  |
 | ConcurrentAccountScans   | For multi-account scans, specify the number of accounts to scan concurrently. This is useful for large organizations with many accounts. Selecting more than three changes the size of the CodeBuild instance and may incur additional costs.                                                                                             |
 | CodeBuildTimeout         | Set the timeout for the CodeBuild job. The default is 300 minutes (5 hours).                                                                                                                                                                                                                                                              |
@@ -518,6 +520,31 @@ A saved query is created as an example. This query counts the checks that failed
 5. Choose **Run** to run the query.
 
     ![Athena saved query results](/img/athena-query-results.png)
+
+## Using an existing bucket
+
+By default, the solution creates a new S3 bucket to store Prowler scan results. If you need to use a pre-existing bucket (for example, if your environment has SCPs that restrict S3 bucket creation), you can specify the bucket name using the `ExistingBucketName` parameter.
+
+When `ExistingBucketName` is provided:
+- No new S3 bucket is created
+- All scan results are uploaded to the specified bucket
+- Glue, Athena, and reporting resources use the specified bucket
+- The existing bucket must allow `s3:PutObject` from the CodeBuild role
+
+### AWS CloudShell
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ExistingBucketName=my-existing-bucket-name
+```
+
+### AWS Console
+
+When deploying via the Console, enter your bucket name in the **ExistingBucketName** parameter field. Leave it empty to create a new bucket (default behavior).
+
+>Note: The existing bucket must have versioning enabled and appropriate permissions for the CodeBuild role to write objects.
 
 ## Frequently Asked Questions (FAQ)
 
