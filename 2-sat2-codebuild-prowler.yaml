@@ -11,6 +11,7 @@ Metadata:
           - MultiAccountScan
           - Reporting
           - EmailAddress
+          - ExistingBucketName
       - Label:
           default: Advanced options
         Parameters:
@@ -39,6 +40,8 @@ Metadata:
         default: Concurrent account scans
       CodeBuildTimeout:
         default: CodeBuild timeout
+      ExistingBucketName:
+        default: (Optional) Existing S3 bucket name
 
 Parameters:
   ProwlerOptions:
@@ -95,6 +98,11 @@ Parameters:
     MaxValue: 2160
     Default: 300
 
+  ExistingBucketName:
+    Description: 'Name of an existing S3 bucket to store assessment results (leave empty to create a new bucket)'
+    Type: String
+    Default: ''
+
 Conditions:
   CreateProwlerRole: !Equals
     - !Ref MultiAccountScan
@@ -105,6 +113,9 @@ Conditions:
   EnableReporting: !Equals
     - !Ref Reporting
     - true
+
+  UseExistingBucket: !Not [!Equals [!Ref ExistingBucketName, '']]
+  CreateNewBucket: !Equals [!Ref ExistingBucketName, '']
 
 Mappings:
   ProwlerScanParameters:
@@ -240,6 +251,7 @@ Resources:
                   - !Sub arn:${AWS::Partition}:apigateway:*::/apis/*
 
   ProwlerFindingsBucket:
+    Condition: CreateNewBucket
     Metadata:
       cfn_nag:
         rules_to_suppress:
@@ -262,6 +274,7 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
   ProwlerFindingsBucketPolicy:
+    Condition: CreateNewBucket
     Type: 'AWS::S3::BucketPolicy'
     Properties:
       Bucket: !Ref ProwlerFindingsBucket
@@ -413,7 +426,10 @@ Resources:
               - Action:
                   - s3:PutObject
                 Effect: Allow
-                Resource: !Sub '${ProwlerFindingsBucket.Arn}/*'
+                Resource: !If
+                  - UseExistingBucket
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}/*'
+                  - !Sub '${ProwlerFindingsBucket.Arn}/*'
         - PolicyName: AssumeRole
           PolicyDocument:
             Version: '2012-10-17'
@@ -453,7 +469,7 @@ Resources:
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
-            Value: !Ref ProwlerFindingsBucket
+            Value: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
             Type: PLAINTEXT
           - Name: PROWLER_OPTIONS
             Value: !Ref 'ProwlerOptions'
@@ -703,8 +719,10 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
-        Name: !Ref ProwlerFindingsBucket
-        Description: !Sub 'SATv2 assessment results in the ${ProwlerFindingsBucket}'
+        Name: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
+        Description: !Sub
+          - 'SATv2 assessment results in the ${BucketName}'
+          - BucketName: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
 
   GlueTableProwlerResults:
     Condition: EnableReporting
@@ -801,7 +819,9 @@ Resources:
               Type: string
             - Name: prowler_version
               Type: string
-          Location: !Sub s3://${ProwlerFindingsBucket}/csv
+          Location: !Sub
+            - s3://${BucketName}/csv
+            - BucketName: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: False
@@ -836,7 +856,9 @@ Resources:
         PublishCloudWatchMetricsEnabled: false
         RequesterPaysEnabled: false
         ResultConfiguration:
-          OutputLocation: !Sub s3://${ProwlerFindingsBucket}/athena_results
+          OutputLocation: !Sub
+            - s3://${BucketName}/athena_results
+            - BucketName: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
         EnforceWorkGroupConfiguration: false
 
   qProwlerOrgSummary:
@@ -897,8 +919,14 @@ Resources:
                   - s3:PutObject
                   - s3:ListMultipartUploadParts
                 Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}'
+                    - !GetAtt ProwlerFindingsBucket.Arn
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}/*'
+                    - !Sub '${ProwlerFindingsBucket.Arn}/*'
               - Effect: Allow
                 Action:
                   - 'glue:GetTable'
@@ -941,7 +969,7 @@ Resources:
       Environment:
         Variables:
           ATHENA_WORKGROUP: !Ref SATv2Reporting
-          BUCKET_REPORT: !Ref ProwlerFindingsBucket
+          BUCKET_REPORT: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
       Runtime: python3.10
       Code:
         ZipFile: |
@@ -1015,7 +1043,7 @@ Resources:
             - SUCCEEDED
             - FAILED
           workgroupName:
-            - !Ref ProwlerFindingsBucket
+            - !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
       State: ENABLED
       Targets:
         - Id: toSNS
@@ -1023,10 +1051,12 @@ Resources:
           InputTransformer:
             InputPathsMap:
               status: $.detail.currentState
-            InputTemplate: !Sub >-
-              "The query to summarize reporting has <status>."
+            InputTemplate: !Sub
+              - >-
+                "The query to summarize reporting has <status>."
 
-              "You can view your results in the ${ProwlerFindingsBucket}/reports bucket."
+                "You can view your results in the ${BucketName}/reports bucket."
+              - BucketName: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
 
   # PPTX reporting
   ProwlerReportingLambdaRole:
@@ -1061,8 +1091,14 @@ Resources:
                   - s3:PutObject
                   - s3:ListMultipartUploadParts
                 Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}'
+                    - !GetAtt ProwlerFindingsBucket.Arn
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}/*'
+                    - !Sub '${ProwlerFindingsBucket.Arn}/*'
         - PolicyName: AccessToCodeBuild
           PolicyDocument:
             Statement:
@@ -1154,7 +1190,7 @@ Resources:
         detail:
           bucket:
             name:
-              - !Ref ProwlerFindingsBucket
+              - !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
           object:
             key:
               - wildcard: reports/*.csv
@@ -1203,8 +1239,14 @@ Resources:
                   - s3:PutObject
                   - s3:ListMultipartUploadParts
                 Resource:
-                  - !GetAtt ProwlerFindingsBucket.Arn
-                  - !Sub ${ProwlerFindingsBucket.Arn}/*
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}'
+                    - !GetAtt ProwlerFindingsBucket.Arn
+                  - !If
+                    - UseExistingBucket
+                    - !Sub 'arn:${AWS::Partition}:s3:::${ExistingBucketName}/*'
+                    - !Sub '${ProwlerFindingsBucket.Arn}/*'
 
   ProwlerReportingCodeBuild:
     Condition: EnableReporting
@@ -1225,7 +1267,7 @@ Resources:
             Value: ''
             Type: PLAINTEXT
           - Name: BUCKET_REPORT
-            Value: !Ref ProwlerFindingsBucket
+            Value: !If [UseExistingBucket, !Ref ExistingBucketName, !Ref ProwlerFindingsBucket]
             Type: PLAINTEXT
       Description: Create Prowler report
       ServiceRole: !GetAtt ProwlerReportingCodeBuildRole.Arn
