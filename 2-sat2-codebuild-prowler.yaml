@@ -339,7 +339,7 @@ Resources:
       Handler: index.lambda_handler
       Role: !Sub ${CodeBuildStartBuildLambdaRole.Arn}
       Timeout: 120
-      Runtime: python3.10
+      Runtime: python3.14
       Code:
         ZipFile: |
           import os
@@ -450,6 +450,7 @@ Resources:
             'CodeBuildComputeType',
           ]
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        HostKernel: 'LINUX_KERNEL_6'
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
@@ -501,7 +502,7 @@ Resources:
           phases:
             install:
               runtime-versions:
-                python: 3.11
+                python: 3.12
               commands:
                 - echo "Installing Prowler and dependencies..."
                 - pip3 install prowler==5.11 --quiet
@@ -942,7 +943,7 @@ Resources:
         Variables:
           ATHENA_WORKGROUP: !Ref SATv2Reporting
           BUCKET_REPORT: !Ref ProwlerFindingsBucket
-      Runtime: python3.10
+      Runtime: python3.14
       Code:
         ZipFile: |
           import os
@@ -1101,7 +1102,7 @@ Resources:
       Handler: index.lambda_handler
       Role: !Sub ${ProwlerReportingLambdaRole.Arn}
       Timeout: 120
-      Runtime: python3.10
+      Runtime: python3.14
       Code:
         ZipFile: |
           import boto3
@@ -1119,14 +1120,10 @@ Resources:
               try:
                 print("Starting build...")
                 response = cb.start_build(projectName='ProwlerReportingCodeBuild', \
-                environmentVariablesOverride=[
-                  {
-                      'name': 'ATHENA_SUMMARY_CSV',
-                      'value': full_path
-                  }])
+                environmentVariablesOverride=[])
                 print(response)
               except ClientError as e:
-                print("Failed to start query")
+                print("Failed to start build")
                 print(e)
 
           def lambda_handler(event,context):
@@ -1219,11 +1216,9 @@ Resources:
       Environment:
         ComputeType: 'BUILD_GENERAL1_SMALL'
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        HostKernel: 'LINUX_KERNEL_6'
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
-          - Name: ATHENA_SUMMARY_CSV
-            Value: ''
-            Type: PLAINTEXT
           - Name: BUCKET_REPORT
             Value: !Ref ProwlerFindingsBucket
             Type: PLAINTEXT
@@ -1237,22 +1232,11 @@ Resources:
         BuildSpec: |
           version: 0.2
           phases:
-            install:
-              runtime-versions:
-                python: 3.11
+            build:
               commands:
                 - echo "Downloading repo..."
                 - git clone https://github.com/awslabs/aws-security-assessment-solution.git
                 - cd aws-security-assessment-solution/reporting
-                - echo "Installing dependencies..."
-                - pip3 install -r requirements.txt
-            build:
-              commands:
-                - echo "Using Athena summary csv $ATHENA_SUMMARY_CSV"
-                - aws s3 cp $ATHENA_SUMMARY_CSV .
-                - python report.py
-            post_build:
-              commands:
                 - echo "Uploading html dashboard to S3..."
                 - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
                 - echo "Done!"
