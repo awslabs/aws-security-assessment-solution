@@ -106,6 +106,10 @@ Conditions:
     - !Ref Reporting
     - true
 
+  IsCommercialPartition: !Equals
+    - !Ref AWS::Partition
+    - aws
+
 Mappings:
   ProwlerScanParameters:
     Basic:
@@ -450,7 +454,7 @@ Resources:
             'CodeBuildComputeType',
           ]
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        HostKernel: 'LINUX_KERNEL_6'
+        HostKernel: !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
@@ -1216,7 +1220,7 @@ Resources:
       Environment:
         ComputeType: 'BUILD_GENERAL1_SMALL'
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        HostKernel: 'LINUX_KERNEL_6'
+        HostKernel: !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
