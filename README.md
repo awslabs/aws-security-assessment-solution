@@ -4,7 +4,7 @@ Cybersecurity remains a very important topic and point of concern for many CIOs,
 
 We have developed an inexpensive, easy to deploy, secure, and fast solution to provide our customers with a security assessment report. These reports are generated using the open source project [Prowler](https://github.com/prowler-cloud/prowler). Prowler performs point in time security assessment based on AWS best practices and can help quickly identify any potential risk areas in a customer’s deployed environment. If you are interested in conducting these assessments on a continuous basis, AWS recommends enabling Security Hub’s [Foundational Security Best Practices standard](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp.html). If you are interested in integrating your Prowler assessment results with Security Hub, you can follow the instructions in the [Prowler Documentation](https://docs.prowler.cloud/en/latest/tutorials/aws/securityhub/).
 
->Note: Prowler is not an AWS owned solution. Customers should independently review Prowler before running this solution. Any dependencies associated with Prowler should be kept up to date. This solution installs the latest version available from pip package installer.
+>Note: Prowler is not an AWS owned solution. Customers should independently review Prowler before running this solution. Any dependencies associated with Prowler should be kept up to date. This solution installs a pinned version of Prowler (currently 5.41.0) from the pip package installer, so that a change to Prowler's output format cannot break a scan without warning. To move to a newer release, edit the `pip3 install prowler==` line in `2-sat2-codebuild-prowler.yaml`.
 
 📕 For more in depth step-by-step instructions, visit module 2 in the [SHIP Workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3bd6e4da-265a-4c79-ab47-639b7ef23c9d/en-US/20-satv2).
 
@@ -34,6 +34,8 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
   - [Full scan](#full-scan)
 - [Notifications](#notifications)
 - [Reporting Summary](#reporting-summary)
+  - [How the Athena table is built](#how-the-athena-table-is-built)
+  - [Scan history and duplicates](#scan-history-and-duplicates)
 - [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [Clean Up](#clean-up)
 - [Security](#security)
@@ -93,10 +95,26 @@ To run the Self-Service Security Assessment solution (SATv2) against a single ac
     wget https://raw.githubusercontent.com/awslabs/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
     ```
 
-4. To deploy the CloudFormation template, enter the following command.
+4. To create an S3 bucket to stage the template, enter the following commands. The template is larger than 51,200 bytes, so CloudFormation requires it to be uploaded to S3 rather than passed inline.
 
     ```bash
-    aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml --stack-name sat2 --capabilities CAPABILITY_NAMED_IAM
+    TEMPLATE_BUCKET=sat2-cfn-templates-$(aws sts get-caller-identity --query Account --output text)-$AWS_REGION
+    aws s3 mb s3://$TEMPLATE_BUCKET --region $AWS_REGION
+    ```
+
+5. To deploy the CloudFormation template, enter the following command. The `--s3-bucket` option uploads the template to the bucket before creating the stack.
+
+    ```bash
+    aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+    --stack-name sat2 \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --s3-bucket $TEMPLATE_BUCKET
+    ```
+
+6. After the stack is created, you can delete the staging bucket. It is only used to hand the template to CloudFormation.
+
+    ```bash
+    aws s3 rb s3://$TEMPLATE_BUCKET --force
     ```
 
 </details>
@@ -220,13 +238,17 @@ These instructions assume you already have the prerequisites for stack set opera
                 "Action": [
                     "organizations:ListAccounts",
                     "organizations:DescribeAccount",
-                    "organizations:ListTagsForResource"
+                    "organizations:ListTagsForResource",
+                    "organizations:ListParents",
+                    "organizations:DescribeOrganizationalUnit"
 			    ],
                 "Resource": "*"
             }
             ]
         }'
         ```
+
+    >Note: `ListParents` and `DescribeOrganizationalUnit` are what fill in the `account_ou_uid` and `account_ou_name` columns in the findings. Omit them and the rest of the scan still works, but those two columns come back empty.
 #### Step 2: Deploy the SATv2 solution
 
 >Note: Make sure you switched to the account you specified will run Prowler.
@@ -237,13 +259,27 @@ These instructions assume you already have the prerequisites for stack set opera
     wget https://raw.githubusercontent.com/awslabs/aws-security-assessment-solution/main/2-sat2-codebuild-prowler.yaml
     ```
 
-2. To deploy the template in the Prowler account. Set **MultiAccountScan** to **true** to scan all the accounts in your organization.
+2. To create an S3 bucket to stage the template, enter the following commands. The template is larger than 51,200 bytes, so CloudFormation requires it to be uploaded to S3 rather than passed inline.
+
+    ```bash
+    TEMPLATE_BUCKET=sat2-cfn-templates-$(aws sts get-caller-identity --query Account --output text)-$AWS_REGION
+    aws s3 mb s3://$TEMPLATE_BUCKET --region $AWS_REGION
+    ```
+
+3. To deploy the template in the Prowler account. Set **MultiAccountScan** to **true** to scan all the accounts in your organization. The `--s3-bucket` option uploads the template to the bucket before creating the stack.
 
     ```bash
     aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
     --stack-name sat2-prowler \
     --capabilities CAPABILITY_NAMED_IAM \
+    --s3-bucket $TEMPLATE_BUCKET \
     --parameter-overrides MultiAccountScan=true
+    ```
+
+4. After the stack is created, you can delete the staging bucket. It is only used to hand the template to CloudFormation.
+
+    ```bash
+    aws s3 rb s3://$TEMPLATE_BUCKET --force
     ```
 
 </details>
@@ -314,13 +350,17 @@ Determine if you have delegated administrator or a resource policy that already 
             "Action": [
                     "organizations:ListAccounts",
                     "organizations:DescribeAccount",
-                    "organizations:ListTagsForResource"
+                    "organizations:ListTagsForResource",
+                    "organizations:ListParents",
+                    "organizations:DescribeOrganizationalUnit"
 			    ],
             "Resource": "*"
         }
         ]
     }
     ```
+
+    >Note: `ListParents` and `DescribeOrganizationalUnit` are what fill in the `account_ou_uid` and `account_ou_name` columns in the findings. Omit them and the rest of the scan still works, but those two columns come back empty.
 
 #### Step 3: Deploy the SATv2 solution
 
@@ -361,7 +401,21 @@ To review the results, follow these steps.
 
 2. Select the bucket that starts with **sat2-prowler-prowlerfindingsbucket-**
 
-3. Choose the folder with the date and time of the scan.
+3. Choose the folder for the output format you want, then the `scan_date=` and `scan_time=` folders for the run you want to review.
+
+    Each output format has its own top level folder, and every run writes into a `scan_date=YYYY-MM-DD/scan_time=HHMMSS` subfolder beneath it. The time is the UTC time the scan started:
+
+    ```
+    csv/scan_date=2026-09-01/scan_time=204955/         Prowler's CSV findings, as written
+    html/scan_date=2026-09-01/scan_time=204955/        per-account HTML reports
+    json/scan_date=2026-09-01/scan_time=204955/        per-account JSON
+    ocsf-json/scan_date=2026-09-01/scan_time=204955/   per-account OCSF JSON
+    parquet/scan_date=2026-09-01/scan_time=204955/     the copy Athena queries
+    compliance/scan_date=2026-09-01/scan_time=204955/  compliance CSVs, when produced
+    reports/                                           consolidated CSV and dashboard
+    ```
+
+    Every run gets its own folder, so running the solution again never mixes new findings in with old ones, including when you run it more than once on the same day. Previous runs are kept so you can compare them.
 
 4. For each account, there will be 4 file types (csv, html, json, json-ocsf) in the format `prowler-output-<aws-account-id>-<datetime>`.
 
@@ -398,12 +452,14 @@ You must have the AWS Command Line Interface (CLI) and valid credentials. For mo
 
 2. Get the name of the Amazon S3 bucket. The name of the bucket is in the CloudFormation console as ProwlerFindingsBucket resource. Alternatively, navigate to the S3 console and look for a bucket in the format `{stack_name}-prowlerfindingsbucket-{ID}`
 
-3. Download the CSVs and compliance data from S3. If you did not run a full scan, you may not have compliance data. Replace `{bucket_name}` with the name of your bucket.
+3. Download the CSVs and compliance data from S3. If you did not run a full scan, you may not have compliance data. Replace `{bucket_name}` with the name of your bucket, and `{scan_date}` and `{scan_time}` with the run you want to load, for example `2026-09-01` and `204955`. To list the available runs, use `aws s3 ls s3://{bucket_name}/csv/scan_date={scan_date}/`.
 
     ```
-    aws s3 sync s3://{bucket_name}/compliance/ output/compliance/
-    aws s3 sync s3://{bucket_name}/csv/ output/
+    aws s3 sync s3://{bucket_name}/compliance/scan_date={scan_date}/scan_time={scan_time}/ output/compliance/
+    aws s3 sync s3://{bucket_name}/csv/scan_date={scan_date}/scan_time={scan_time}/ output/
     ```
+
+    >Note: Sync one run at a time. The Prowler dashboard reads `output/*.csv` and does not search subfolders, so copying the `scan_date=` folders themselves into `output/` will produce an empty dashboard. Loading two runs at once would show each finding twice.
 
 4. Run the dashboard. Use the following command to run the dashboard. By default, it will start on http://127.0.0.1:11666/.
 
@@ -421,8 +477,11 @@ For example, a single account scan using the intermediate scan option would use 
 aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 --stack-name sat2-prowler \
 --capabilities CAPABILITY_NAMED_IAM \
+--s3-bucket $TEMPLATE_BUCKET \
 --parameter-overrides ProwlerScanType=Intermediate
 ```
+
+>Note: The `--s3-bucket` option is required because the template is larger than 51,200 bytes, the maximum CloudFormation accepts inline. `$TEMPLATE_BUCKET` is the staging bucket created in the CloudShell deployment steps above. It applies to every `aws cloudformation deploy` example in this README.
 
 Checks are frequently added, to see the latest checks, run `prowler aws --list-checks` command. An example has been provided below for each check level.
 
@@ -473,6 +532,7 @@ For example, a single account scan with email notifications would use this comma
 aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 --stack-name sat2-prowler \
 --capabilities CAPABILITY_NAMED_IAM \
+--s3-bucket $TEMPLATE_BUCKET \
 --parameter-overrides EmailAddress=email@domain.com
 ```
 
@@ -491,9 +551,44 @@ With or without the optional EmailAddress parameter set, you can view the progre
 
 ## Reporting Summary
 
-You can optionally enable reporting to summarize multiple Prowler scan csv files into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reports folder.
+You can optionally enable reporting to summarize multiple Prowler scan results into a single file. This may be helpful when running Prowler across multiple accounts in an AWS Organization. The reporting summary feature is off by default. To enable reporting, set the Reporting parameter to true when you deploy the CloudFormation template. This will create an Athena WorkGroup, a Glue table, and automatically run a query to consolidate the results. The summarized csv file is located in the same S3 bucket as the Prowler results in the /reports folder.
 
 If you specify an email address while reporting is enabled, you will get a second email when the Athena query is finished.
+
+### How the Athena table is built
+
+Athena queries the `parquet/` copy of the findings rather than Prowler's CSV. The CodeBuild project converts each CSV to Parquet before uploading it, and the Glue table `prowler` points at `parquet/`.
+
+The conversion exists because Prowler 5.17.0 and later ship multi-line markdown in their check metadata, so the `DESCRIPTION`, `RISK` and `REMEDIATION_*` fields contain newlines. Prowler quotes those fields correctly, but Athena reads CSV through Hive's `TextInputFormat`, which splits records on newlines before any SerDe runs. A CSV-backed table therefore returns one row per physical line instead of one row per finding, and silently drops the columns that follow the first multi-line field. Parquet does not use newlines as record boundaries, so the text survives intact. Parquet also compresses the repeated remediation text heavily, which makes queries cheaper: a 116 MB set of CSVs becomes roughly 3 MB of Parquet.
+
+The `csv/` folder is left exactly as Prowler wrote it, so the Prowler dashboard and any existing CSV tooling keep working.
+
+### Scan history and duplicates
+
+The table is partitioned on `scan_date` **and** `scan_time`, so every run of the solution gets its own partition. Two things follow from this:
+
+- The consolidated CSV in `/reports` covers only the most recent run, so re-running the solution never double counts findings, and findings that no longer exist do not linger in the report.
+- Earlier runs stay queryable. `scan_date` and `scan_time` are normal columns, so you can compare results between runs. The **Prowler scan trend** saved query does this, one row per run.
+
+Partitioning on the date alone is not sufficient. A second scan on the same day would write into the same partition, and its findings would be merged with the earlier run's rather than replacing them. Any finding that the newer scan no longer reports, because a resource was deleted, an account left the organization, a member role stopped working, or the scan type was narrowed, would still appear in the report and look current.
+
+New partitions are registered automatically: the reporting Lambda runs `MSCK REPAIR TABLE` before it runs the consolidation query, so there is no crawler to schedule and nothing to add by hand.
+
+If you write your own Athena queries, restrict them to a single run or you will aggregate every scan in the bucket at once. Both keys are fixed width, so comparing them concatenated orders runs chronologically:
+
+```sql
+SELECT severity, count(*)
+FROM "{bucket_name}"."prowler"
+WHERE status = 'FAIL'
+  AND concat(scan_date, scan_time) = (
+      SELECT max(concat(scan_date, scan_time)) FROM "{bucket_name}"."prowler"
+  )
+GROUP BY severity
+```
+
+To query a whole day across all of its runs, filter on `scan_date` alone.
+
+>Note: If you are upgrading a deployment that used the earlier `scan_date`-only layout, results from before the upgrade are not visible to the new table, because their S3 paths have no `scan_time=` level. The data is untouched in S3. Either let the next scan repopulate the table, or move the old files into a `scan_time=` folder, for example `aws s3 mv s3://{bucket_name}/parquet/scan_date={scan_date}/ s3://{bucket_name}/parquet/scan_date={scan_date}/scan_time=000000/ --recursive`, and then run `MSCK REPAIR TABLE prowler` in Athena.
 
 For example, a multi-account scan with reporting and email alerts enabled would use this command:
 
@@ -501,12 +596,20 @@ For example, a multi-account scan with reporting and email alerts enabled would 
 aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 --stack-name sat2-prowler \
 --capabilities CAPABILITY_NAMED_IAM \
+--s3-bucket $TEMPLATE_BUCKET \
 --parameter-overrides MultiAccountScan=true Reporting=true EmailAddress=email@domain.com
 ```
 
 ![reporting architecture diagram](img/reporting2.png)
 
-A saved query is created as an example. This query counts the checks that failed across all the accounts assessed. To review and run the query, follow these steps:
+Two saved queries are created as examples:
+
+| Saved query                  | What it shows                                                          |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| Prowler organization summary | Failed checks across every assessed account, for the most recent scan. |
+| Prowler scan trend           | Failed checks per scan date and severity, to compare runs over time.   |
+
+To review and run a query, follow these steps:
 
 1. Navigate to the Amazon Athena console.
 2. Choose the workgroup that begins with sat2-prowler-*.
