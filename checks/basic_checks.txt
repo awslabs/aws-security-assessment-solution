@@ -1,25 +1,17 @@
-                         _
- _ __  _ __ _____      _| | ___ _ __
-| '_ \| '__/ _ \ \ /\ / / |/ _ \ '__|
-| |_) | | | (_) \ V  V /| |  __/ |
-| .__/|_|  \___/ \_/\_/ |_|\___|_|v5.11.0
-|_| the handy multi-cloud security tool
-
-Date: 2025-09-03 13:36:11
-
-[account_maintain_current_contact_details] Maintain current contact details. - account [medium]
-[awslambda_function_using_supported_runtimes] Find obsolete Lambda runtimes. - awslambda [medium]
-[cloudtrail_multi_region_enabled] Ensure CloudTrail is enabled in all regions - cloudtrail [high]
-[config_recorder_all_regions_enabled] Ensure AWS Config is enabled in all regions. - config [medium]
-[ec2_securitygroup_allow_ingress_from_internet_to_any_port] Ensure no security groups allow ingress from 0.0.0.0/0 or ::/0 to any port. - ec2 [high]
-[guardduty_is_enabled] Check if GuardDuty is enabled - guardduty [medium]
-[iam_password_policy_lowercase] Ensure IAM password policy require at least one lowercase letter - iam [medium]
-[iam_password_policy_number] Ensure IAM password policy require at least one number - iam [medium]
-[iam_password_policy_symbol] Ensure IAM password policy require at least one symbol - iam [medium]
-[iam_password_policy_uppercase] Ensure IAM password policy requires at least one uppercase letter - iam [medium]
-[iam_root_mfa_enabled] Ensure MFA is enabled for the root account - iam [critical]
-[iam_rotate_access_key_90_days] Ensure access keys are rotated every 90 days or less - iam [medium]
-[s3_bucket_public_access] Ensure there are no S3 buckets open to Everyone or Any AWS user. - s3 [critical]
+# Generated with Prowler 5.41.0 (You are running the latest version, yay!) on 2026-09-04 14:54:33 UTC
+[account_maintain_current_contact_details] AWS account contact information is current - account [medium]
+[awslambda_function_using_supported_runtimes] Lambda function uses a supported runtime - awslambda [medium]
+[cloudtrail_multi_region_enabled] Region has at least one CloudTrail trail logging - cloudtrail [high]
+[config_recorder_all_regions_enabled] AWS Config recorder is enabled and not in failure state or disabled - config [medium]
+[ec2_securitygroup_allow_ingress_from_internet_to_any_port] Security group has no 0.0.0.0/0 or ::/0 ingress to any port, or is attached only to allowed interface types or instance owners - ec2 [high]
+[guardduty_is_enabled] GuardDuty detector is enabled and not suspended - guardduty [high]
+[iam_password_policy_lowercase] IAM password policy requires at least one lowercase letter - iam [low]
+[iam_password_policy_number] IAM password policy requires at least one number - iam [medium]
+[iam_password_policy_symbol] IAM password policy requires at least one symbol - iam [medium]
+[iam_password_policy_uppercase] IAM password policy requires at least one uppercase letter - iam [medium]
+[iam_root_mfa_enabled] Root account has MFA enabled - iam [critical]
+[iam_rotate_access_key_90_days] IAM user does not have active access keys older than 90 days - iam [medium]
+[s3_bucket_public_access] S3 bucket is not publicly accessible to Everyone or Authenticated Users - s3 [critical]
 
 There are 13 available checks.
 

@@ -48,6 +48,8 @@ Resources:
             Statement:
               - Action:
                 - account:Get*
+                - amplify:ListApps
+                - amplify:ListBranches
                 - appstream:Describe*
                 - appstream:List*
                 - backup:List*
@@ -68,7 +70,9 @@ Resources:
                 - ec2:GetEbsEncryptionByDefault
                 - ec2:GetSnapshotBlockPublicAccessState
                 - ec2:GetInstanceMetadataDefaults
+                - ecr:BatchGetImage
                 - ecr:Describe*
+                - ecr:GetDownloadUrlForLayer
                 - ecr:GetRegistryScanningConfiguration
                 - elasticfilesystem:DescribeBackupPolicy
                 - glue:GetConnections
@@ -76,6 +80,7 @@ Resources:
                 - glue:SearchTables
                 - glue:GetMLTransforms
                 - lambda:GetFunction*
+                - lambda:GetLayerVersion
                 - lightsail:GetRelationalDatabases
                 - logs:FilterLogEvents
                 - macie2:GetMacieSession

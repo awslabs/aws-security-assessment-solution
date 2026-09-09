@@ -2,6 +2,26 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Self-Service Security Assessment Solutions (v2)
 
 Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        # W1030 flags CodeBuildTimeout's MaxValue of 2160 against
+        # AWS::CodeBuild::Project TimeoutInMinutes because cfn-lint's bundled
+        # resource schema still caps that property at 480 (8 hours), the limit
+        # that applied before CodeBuild raised it to 2160 (36 hours) in June
+        # 2024. CloudFormation accepts 5-2160, so the parameter range is valid
+        # and the finding is a stale-schema false positive.
+        #
+        # This has to be suppressed at the template level. A resource level
+        # ignore_checks on ProwlerCodeBuild has no effect: even though the
+        # message names Resources/ProwlerCodeBuild/Properties/TimeoutInMinutes,
+        # W1030 anchors the match on the parameter definition
+        # (Parameters/CodeBuildTimeout/MaxValue), so a resource scoped ignore
+        # never sees it.
+        #
+        # Remove this once cfn-lint picks up the updated schema.
+        - W1030
+
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
@@ -188,6 +208,8 @@ Resources:
             Statement:
               - Action:
                   - account:Get*
+                  - amplify:ListApps
+                  - amplify:ListBranches
                   - appstream:Describe*
                   - appstream:List*
                   - backup:List*
@@ -208,7 +230,9 @@ Resources:
                   - ec2:GetEbsEncryptionByDefault
                   - ec2:GetSnapshotBlockPublicAccessState
                   - ec2:GetInstanceMetadataDefaults
+                  - ecr:BatchGetImage
                   - ecr:Describe*
+                  - ecr:GetDownloadUrlForLayer
                   - ecr:GetRegistryScanningConfiguration
                   - elasticfilesystem:DescribeBackupPolicy
                   - glue:GetConnections
@@ -216,6 +240,7 @@ Resources:
                   - glue:SearchTables
                   - glue:GetMLTransforms
                   - lambda:GetFunction*
+                  - lambda:GetLayerVersion
                   - lightsail:GetRelationalDatabases
                   - logs:FilterLogEvents
                   - macie2:GetMacieSession
@@ -434,6 +459,15 @@ Resources:
                   - organizations:ListAccounts
                   - organizations:DescribeAccount
                   - organizations:ListTagsForResource
+                  # ListParents and DescribeOrganizationalUnit populate the
+                  # account_ou_uid and account_ou_name findings columns. Prowler
+                  # walks up from the account to the root, reading the name of
+                  # every OU on the way, so both actions are needed. Without
+                  # them the OU lookup fails silently (Prowler logs a warning
+                  # and carries on) and both columns come back empty in Athena
+                  # even though the rest of the Organizations data is present.
+                  - organizations:ListParents
+                  - organizations:DescribeOrganizationalUnit
                 Effect: Allow
                 Resource: '*'
 
@@ -454,7 +488,8 @@ Resources:
             'CodeBuildComputeType',
           ]
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        HostKernel: !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
+        HostKernel:
+          !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT
@@ -509,7 +544,15 @@ Resources:
                 python: 3.12
               commands:
                 - echo "Installing Prowler and dependencies..."
-                - pip3 install prowler==5.11 --quiet
+                - pip3 install prowler==5.41.0 --quiet
+                # Athena reads a Parquet copy of the findings rather than Prowler's CSV.
+                # Since Prowler 5.17.0 the check metadata is multi-line markdown, so the
+                # DESCRIPTION, RISK and REMEDIATION_* fields contain embedded newlines.
+                # Prowler quotes them correctly per RFC4180, but Hive's TextInputFormat
+                # splits records on newlines before any SerDe runs, so a CSV-backed table
+                # reads one row per physical line instead of one row per finding. Parquet
+                # record boundaries are not newlines, so the text survives intact.
+                - pip3 install pyarrow==25.0.1 --quiet
                 - prowler -v
             build:
               commands:
@@ -574,6 +617,114 @@ Resources:
             post_build:
               commands:
                 - echo "CODEBUILD_BUILD_SUCCEEDING status is $CODEBUILD_BUILD_SUCCEEDING "
+                # Writes the Parquet copy that the Athena table reads. Prowler's CSV is
+                # parsed with a real RFC4180 reader so that fields spanning several
+                # physical lines are kept whole, then written to Parquet where the record
+                # boundary is not a newline. Every value stays a string except MUTED, so
+                # the Glue schema is unchanged apart from the columns Prowler added.
+                - |
+                  cat > /tmp/prowler_csv_to_parquet.py <<'PROWLER_PARQUET_EOF'
+                  import csv
+                  import glob
+                  import os
+                  import sys
+
+                  import pyarrow as pa
+                  import pyarrow.parquet as pq
+
+                  # Prowler emits very large single fields (full markdown remediation
+                  # snippets), so the default 128 KB field limit is not enough.
+                  csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
+
+                  DELIMITER = ";"
+                  QUOTECHAR = '"'
+                  ROWS_PER_GROUP = 5000
+                  BOOL_COLUMNS = {"muted"}
+                  TRUE_VALUES = {"true", "1", "yes"}
+
+
+                  def arrow_type(column):
+                      return pa.bool_() if column in BOOL_COLUMNS else pa.string()
+
+
+                  def cast(column, value):
+                      if column not in BOOL_COLUMNS:
+                          return value
+                      if value is None or value == "":
+                          return None
+                      return value.strip().lower() in TRUE_VALUES
+
+
+                  def convert(src, dst):
+                      with open(src, newline="", encoding="utf-8") as handle:
+                          reader = csv.reader(handle, delimiter=DELIMITER, quotechar=QUOTECHAR)
+                          try:
+                              header = [name.strip().lower() for name in next(reader)]
+                          except StopIteration:
+                              return None, 0
+                          schema = pa.schema([(name, arrow_type(name)) for name in header])
+                          columns = [[] for _ in header]
+                          rows = 0
+                          ragged = 0
+                          writer = pq.ParquetWriter(dst, schema, compression="snappy")
+                          try:
+                              for row in reader:
+                                  if len(row) != len(header):
+                                      ragged += 1
+                                      row = (row + [""] * len(header))[: len(header)]
+                                  for index, name in enumerate(header):
+                                      columns[index].append(cast(name, row[index]))
+                                  rows += 1
+                                  if rows % ROWS_PER_GROUP == 0:
+                                      writer.write_table(
+                                          pa.Table.from_pydict(
+                                              dict(zip(header, columns)), schema=schema
+                                          )
+                                      )
+                                      for column in columns:
+                                          del column[:]
+                              if columns[0]:
+                                  writer.write_table(
+                                      pa.Table.from_pydict(
+                                          dict(zip(header, columns)), schema=schema
+                                      )
+                                  )
+                          finally:
+                              writer.close()
+                      if ragged:
+                          sys.stderr.write(
+                              "WARN %s: %d rows did not match the header width\n"
+                              % (os.path.basename(src), ragged)
+                          )
+                      return header, rows
+
+
+                  def main():
+                      src_dir, dst_dir = sys.argv[1], sys.argv[2]
+                      os.makedirs(dst_dir, exist_ok=True)
+                      # Non-recursive on purpose: the compliance CSVs live in a
+                      # subdirectory and have a completely different schema.
+                      sources = sorted(glob.glob(os.path.join(src_dir, "prowler-output-*.csv")))
+                      if not sources:
+                          sys.stderr.write("ERROR: no Prowler CSV output found in %s\n" % src_dir)
+                          return 1
+                      total = 0
+                      for src in sources:
+                          name = os.path.basename(src)[: -len(".csv")] + ".parquet"
+                          dst = os.path.join(dst_dir, name)
+                          header, rows = convert(src, dst)
+                          if header is None:
+                              sys.stderr.write("WARN %s is empty, skipped\n" % os.path.basename(src))
+                              continue
+                          total += rows
+                          print("%s: %d findings, %d columns" % (name, rows, len(header)))
+                      print("Converted %d file(s) and %d findings to Parquet" % (len(sources), total))
+                      return 0
+
+
+                  if __name__ == "__main__":
+                      sys.exit(main())
+                  PROWLER_PARQUET_EOF
                 - |
 
                   if [ $CODEBUILD_BUILD_SUCCEEDING -eq 0 ]; then
@@ -582,40 +733,81 @@ Resources:
                   elif [ $CODEBUILD_BUILD_SUCCEEDING -eq 1 ]; then
                       echo "The build stage succeeded. Now uploading reports to S3 bucket ..."
 
+                      # Every artifact from this run is written under
+                      # scan_date=<YYYY-MM-DD>/scan_time=<HHMMSS>. The Athena table is
+                      # partitioned on both, so each run is isolated: the reporting query
+                      # reads one run and sees a true snapshot. Partitioning on the date
+                      # alone is not enough, because a second scan on the same day would
+                      # land in the same partition and its findings would be merged with
+                      # the earlier run's, leaving stale findings in the results.
+                      #
+                      # Both values come from a single reading of the build start time, so
+                      # a scan that runs across UTC midnight cannot be split in two and the
+                      # date and time can never disagree.
+                      if [ -n "$CODEBUILD_START_TIME" ]; then
+                          SCAN_STAMP=$(date -u -d "@$((CODEBUILD_START_TIME / 1000))" +%Y-%m-%dT%H%M%S 2>/dev/null || date -u +%Y-%m-%dT%H%M%S)
+                      else
+                          SCAN_STAMP=$(date -u +%Y-%m-%dT%H%M%S)
+                      fi
+                      SCAN_DATE=${SCAN_STAMP%T*}
+                      SCAN_TIME=${SCAN_STAMP#*T}
+                      PARTITION="scan_date=$SCAN_DATE/scan_time=$SCAN_TIME"
+                      echo "Writing this run to partition $PARTITION"
+
                       upload_failed=false
 
+                      echo "Converting CSV findings to Parquet for Athena..."
+                      if ! python3 /tmp/prowler_csv_to_parquet.py output output-parquet; then
+                          echo "ERROR: Failed to convert Prowler CSV output to Parquet"
+                          upload_failed=true
+                      fi
+
+                      echo "Uploading Parquet findings..."
+                      if ! aws s3 cp --exclude "*" --include "*.parquet" output-parquet/ s3://$BUCKET_REPORT/parquet/$PARTITION/ --recursive; then
+                          echo "ERROR: Failed to upload Parquet findings"
+                          upload_failed=true
+                      fi
+
                       echo "Uploading CSV reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ s3://$BUCKET_REPORT/csv/ --recursive; then
+                      if ! aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ s3://$BUCKET_REPORT/csv/$PARTITION/ --recursive; then
                           echo "ERROR: Failed to upload CSV reports"
                           upload_failed=true
                       fi
 
+                      # Not every scan type produces compliance output. Without this
+                      # guard the copy fails on a missing directory, the phase exits 1,
+                      # and because the reporting rule only fires on a SUCCEEDED build
+                      # the whole summary step would be skipped.
                       echo "Uploading compliance CSV reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.csv" output/compliance/ s3://$BUCKET_REPORT/compliance/ --recursive; then
-                          echo "ERROR: Failed to upload compliance CSV reports"
-                          upload_failed=true
+                      if [ -d output/compliance ]; then
+                          if ! aws s3 cp --exclude "*" --include "*.csv" output/compliance/ s3://$BUCKET_REPORT/compliance/$PARTITION/ --recursive; then
+                              echo "ERROR: Failed to upload compliance CSV reports"
+                              upload_failed=true
+                          fi
+                      else
+                          echo "This scan produced no compliance output; nothing to upload."
                       fi
 
                       echo "Uploading OCSF JSON reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/ --recursive; then
+                      if ! aws s3 cp --exclude "*" --include "*.ocsf.json" output/ s3://$BUCKET_REPORT/ocsf-json/$PARTITION/ --recursive; then
                           echo "ERROR: Failed to upload OCSF JSON reports"
                           upload_failed=true
                       fi
 
                       echo "Uploading JSON reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/ --recursive; then
+                      if ! aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ s3://$BUCKET_REPORT/json/$PARTITION/ --recursive; then
                           echo "ERROR: Failed to upload JSON reports"
                           upload_failed=true
                       fi
 
                       echo "Uploading HTML reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/ --recursive; then
+                      if ! aws s3 cp --exclude "*" --include "*.html" output/ s3://$BUCKET_REPORT/html/$PARTITION/ --recursive; then
                           echo "ERROR: Failed to upload HTML reports"
                           upload_failed=true
                       fi
 
                       echo "Uploading ASFF JSON reports..."
-                      if ! aws s3 cp --exclude "*" --include "*.asff.json" output/ s3://$BUCKET_REPORT/asff-json/ --recursive; then
+                      if ! aws s3 cp --exclude "*" --include "*.asff.json" output/ s3://$BUCKET_REPORT/asff-json/$PARTITION/ --recursive; then
                           echo "ERROR: Failed to upload ASFF JSON reports"
                           upload_failed=true
                       fi
@@ -719,9 +911,22 @@ Resources:
       DatabaseName: !Ref GlueDatabaseSATv2Findings
       TableInput:
         Name: 'prowler'
-        Description: 'Results of the Prowler scan from SATv2'
+        Description: 'Results of the Prowler scan from SATv2, partitioned by scan date'
         TableType: EXTERNAL_TABLE
-        Parameters: { 'skip.header.line.count': '1', 'classification': 'csv' }
+        Parameters: { 'classification': 'parquet' }
+        # One partition per scan run, keyed on the date and the time the run
+        # started. Partitioning on the date alone would merge two scans from the
+        # same day, so the newest results would be mixed with the previous run's
+        # and findings that no longer exist would linger in the report.
+        # Keeping the date as its own key means a whole day can still be queried
+        # with an equality filter, which lets Athena prune partitions.
+        # New partitions are registered by the MSCK REPAIR TABLE that
+        # AthenaStartQueryLambda runs before the consolidation query.
+        PartitionKeys:
+          - Name: scan_date
+            Type: string
+          - Name: scan_time
+            Type: string
         StorageDescriptor:
           Columns:
             - Name: auth_method
@@ -806,15 +1011,21 @@ Resources:
               Type: string
             - Name: prowler_version
               Type: string
-          Location: !Sub s3://${ProwlerFindingsBucket}/csv
-          InputFormat: org.apache.hadoop.mapred.TextInputFormat
-          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+            # Columns added by Prowler 5.20.0.
+            - Name: additional_urls
+              Type: string
+            - Name: account_ou_uid
+              Type: string
+            - Name: account_ou_name
+              Type: string
+          Location: !Sub s3://${ProwlerFindingsBucket}/parquet
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
           Compressed: False
           StoredAsSubDirectories: False
           SerdeInfo:
-            SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
-            Parameters:
-              { 'escapeChar': "\\", 'quoteChar': '"', 'separatorChar': ';' }
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+            Parameters: { 'serialization.format': '1' }
         Retention: 0
 
   LakeFormationPermissionsLambda:
@@ -824,7 +1035,10 @@ Resources:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !Sub ${AthenaStartQueryLambdaRole.Arn}
       Permissions:
+        # ALTER is required so the Lambda can register the scan_date partition of
+        # the current run via MSCK REPAIR TABLE before it queries the results.
         - SELECT
+        - ALTER
       Resource:
         TableResource:
           DatabaseName: !Ref GlueDatabaseSATv2Findings
@@ -853,6 +1067,10 @@ Resources:
       Name: 'Prowler organization summary'
       QueryString: !Sub |
         -- Count the number of recommendations across all assessed accounts.
+        -- The table holds one partition per scan run, keyed on scan_date and
+        -- scan_time. Restricting to the newest run matters: without it the query
+        -- totals every scan ever run, and filtering on the date alone would still
+        -- merge two runs from the same day.
           SELECT
               check_id,
               count(*) as count
@@ -860,10 +1078,46 @@ Resources:
               "${GlueDatabaseSATv2Findings}"."prowler"
           WHERE
               status = 'FAIL'
+              AND concat(scan_date, scan_time) = (
+                  SELECT max(concat(scan_date, scan_time))
+                  FROM "${GlueDatabaseSATv2Findings}"."prowler"
+              )
           GROUP BY
               check_id
           ORDER BY
               count desc
+      WorkGroup: !Ref SATv2Reporting
+
+  qProwlerScanTrend:
+    Condition: EnableReporting
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref GlueDatabaseSATv2Findings
+      Description: 'Compare failed checks between scans to see whether posture is improving'
+      Name: 'Prowler scan trend'
+      QueryString: !Sub |
+        -- Compare failed checks across every scan retained in the bucket.
+        -- One row per scan run per severity. Grouping on scan_time as well as
+        -- scan_date keeps two runs from the same day as separate rows instead of
+        -- adding them together.
+          SELECT
+              scan_date,
+              scan_time,
+              severity,
+              count(*) as failed_checks,
+              count(distinct account_uid) as accounts
+          FROM
+              "${GlueDatabaseSATv2Findings}"."prowler"
+          WHERE
+              status = 'FAIL'
+          GROUP BY
+              scan_date,
+              scan_time,
+              severity
+          ORDER BY
+              scan_date desc,
+              scan_time desc,
+              failed_checks desc
       WorkGroup: !Ref SATv2Reporting
 
   AthenaStartQueryLambdaRole:
@@ -891,6 +1145,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'athena:StartQueryExecution'
+                  # Required to poll MSCK REPAIR TABLE to completion before the
+                  # consolidation query runs. Without it the Lambda cannot see
+                  # whether the partition was registered.
+                  - 'athena:GetQueryExecution'
                 Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${SATv2Reporting}
               - Effect: Allow
                 Action:
@@ -908,6 +1166,12 @@ Resources:
                 Action:
                   - 'glue:GetTable'
                   - 'glue:GetDatabase'
+                  # MSCK REPAIR TABLE registers the scan_date partition written by
+                  # the CodeBuild run before the consolidation query reads it.
+                  - 'glue:GetPartition'
+                  - 'glue:GetPartitions'
+                  - 'glue:CreatePartition'
+                  - 'glue:BatchCreatePartition'
                 Resource:
                   - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
                   - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseSATv2Findings}
@@ -947,34 +1211,168 @@ Resources:
         Variables:
           ATHENA_WORKGROUP: !Ref SATv2Reporting
           BUCKET_REPORT: !Ref ProwlerFindingsBucket
+          GLUE_DATABASE: !Ref GlueDatabaseSATv2Findings
+          GLUE_TABLE: !Ref GlueTableProwlerResults
       Runtime: python3.14
       Code:
         ZipFile: |
           import os
+          import time
+
           import boto3
           from botocore.exceptions import ClientError
 
           S3_BUCKET = os.environ['BUCKET_REPORT']
           WORKGROUP = os.environ['ATHENA_WORKGROUP']
+          DATABASE = os.environ['GLUE_DATABASE']
+          TABLE = os.environ['GLUE_TABLE']
 
-          def startQuery(event, context):
-              responseData = {}
-              athena = boto3.client('athena')
+          # Columns that never contain newlines, copied through unchanged.
+          PLAIN_COLUMNS = [
+              'scan_date', 'scan_time', '"timestamp"', 'account_uid', 'account_name',
+              'account_ou_uid', 'account_ou_name', 'region', 'service_name',
+              'check_id', 'check_title', 'status', 'status_extended', 'severity',
+              'muted', 'resource_type', 'resource_uid', 'resource_name',
+              'related_url', 'remediation_recommendation_url',
+              'categories', 'prowler_version', 'finding_uid',
+          ]
+
+          # Prowler 5.17.0 and later put multi-line markdown in these fields. The
+          # Parquet table keeps the original text so Athena queries see it in full,
+          # but the consolidated CSV is read by satv2-dashboard.html, whose parser
+          # splits on newlines and discards any row whose field count does not match
+          # the header. Collapsing the newlines here keeps the dashboard working
+          # without degrading what is stored in the table.
+          MULTILINE_COLUMNS = [
+              'description',
+              'risk',
+              'remediation_recommendation_text',
+          ]
+
+          # Deliberately absent from the consolidated CSV, because the dashboard
+          # reads none of them and they dominate its size:
+          #   remediation_code_*  roughly doubles the file
+          #   compliance          about 29% of it on a multi-account scan
+          # Both remain in the Parquet table, so Athena queries still see them.
+          # Compliance framework mappings are available there and in the
+          # per-account files under the compliance/ prefix.
+
+
+          def qualified_table():
+              return '"AwsDataCatalog"."{}"."{}"'.format(DATABASE, TABLE)
+
+
+          def build_consolidation_query():
+              """The most recent run only, one row per finding, no newlines.
+
+              The run is identified by scan_date + scan_time rather than the date,
+              so a second scan on the same day replaces the earlier one in the
+              report instead of being merged with it. Both keys are fixed width and
+              zero padded, so comparing them as one concatenated string orders runs
+              chronologically.
+
+              The finding_uid de-duplication is a safety net. Each run has its own
+              partition, so duplicates should not arise; this keeps the report
+              correct even if two runs somehow share a partition.
+              """
+              columns = list(PLAIN_COLUMNS)
+              for column in MULTILINE_COLUMNS:
+                  columns.append(
+                      "regexp_replace({0}, '[\\r\\n]+', ' ') AS {0}".format(column)
+                  )
+              return (
+                  'WITH latest AS ('
+                  ' SELECT max(concat(scan_date, scan_time)) AS run_key FROM {table}'
+                  '), deduped AS ('
+                  ' SELECT p.*, row_number() OVER ('
+                  ' PARTITION BY p.finding_uid ORDER BY p."timestamp" DESC'
+                  ' ) AS sat_row'
+                  ' FROM {table} AS p'
+                  ' JOIN latest ON concat(p.scan_date, p.scan_time) = latest.run_key'
+                  ') SELECT {columns} FROM deduped WHERE sat_row = 1'
+              ).format(table=qualified_table(), columns=', '.join(columns))
+
+
+          def run_and_wait(athena, query, label, timeout=90):
+              """Run a query to completion. Results land in athena_results/ so that
+              they do not trip the reports/*.csv rule that builds the dashboard."""
               try:
-                print("Starting query...")
-                response = athena.start_query_execution(
-                    QueryString="""SELECT * FROM \"AwsDataCatalog\".\"{}\".\"prowler\"""".format(S3_BUCKET),
-                    WorkGroup=WORKGROUP,
-                    ResultConfiguration={'OutputLocation': f's3://{S3_BUCKET}/reports'}
-                    )
-                print(response)
-              except ClientError as e:
-                print("Failed to start query")
-                print(e)
+                  response = athena.start_query_execution(
+                      QueryString=query,
+                      QueryExecutionContext={'Database': DATABASE},
+                      WorkGroup=WORKGROUP,
+                      ResultConfiguration={
+                          'OutputLocation': 's3://{}/athena_results'.format(S3_BUCKET)
+                      },
+                  )
+              except ClientError as error:
+                  print('{}: failed to start: {}'.format(label, error))
+                  return False
+              execution_id = response['QueryExecutionId']
+              print('{}: started {}'.format(label, execution_id))
+              deadline = time.time() + timeout
+              while time.time() < deadline:
+                  try:
+                      execution = athena.get_query_execution(
+                          QueryExecutionId=execution_id
+                      )['QueryExecution']
+                  except ClientError as error:
+                      # A polling failure must not abort the run. The partition may
+                      # well have been registered anyway, and the consolidation
+                      # query is far more important than confirming this step.
+                      print('{}: cannot check status: {}'.format(label, error))
+                      return False
+                  state = execution['Status']['State']
+                  if state in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
+                      print('{}: {}'.format(label, state))
+                      if state != 'SUCCEEDED':
+                          print(execution['Status'].get('StateChangeReason', ''))
+                      return state == 'SUCCEEDED'
+                  time.sleep(2)
+              print('{}: timed out waiting for completion'.format(label))
+              return False
 
-          def lambda_handler(event,context):
-              print(event)
-              startQuery(event, context)
+
+          def describe_trigger(event):
+              """Summarise the event for the log. The raw CodeBuild state change
+              embeds the entire buildspec, which buries anything useful."""
+              if not isinstance(event, dict):
+                  return {'event': repr(event)[:200]}
+              detail = event.get('detail') or {}
+              return {
+                  'source': event.get('source'),
+                  'project-name': detail.get('project-name'),
+                  'build-status': detail.get('build-status'),
+                  'build-id': detail.get('build-id'),
+              }
+
+
+          def lambda_handler(event, context):
+              print(describe_trigger(event))
+              athena = boto3.client('athena')
+              # Register the scan_date partition the CodeBuild run just uploaded.
+              # Without this the consolidation query cannot see the new results.
+              if not run_and_wait(
+                  athena,
+                  'MSCK REPAIR TABLE `{}`'.format(TABLE),
+                  'MSCK REPAIR TABLE',
+              ):
+                  print('Partition repair did not succeed; querying anyway.')
+              try:
+                  print('Starting consolidation query...')
+                  response = athena.start_query_execution(
+                      QueryString=build_consolidation_query(),
+                      WorkGroup=WORKGROUP,
+                      ResultConfiguration={
+                          'OutputLocation': 's3://{}/reports'.format(S3_BUCKET)
+                      },
+                  )
+                  print('Consolidation query started: {}'.format(
+                      response['QueryExecutionId']
+                  ))
+              except ClientError as error:
+                  print("Failed to start query")
+                  print(error)
 
   AthenaStartQueryLambdaInvokePermission:
     Condition: EnableReporting
@@ -1019,6 +1417,10 @@ Resources:
           currentState:
             - SUCCEEDED
             - FAILED
+          # The Lambda runs MSCK REPAIR TABLE (DDL) before the consolidation query
+          # (DML). Matching only DML keeps this to one notification per scan.
+          statementType:
+            - DML
           workgroupName:
             - !Ref ProwlerFindingsBucket
       State: ENABLED
@@ -1220,7 +1622,8 @@ Resources:
       Environment:
         ComputeType: 'BUILD_GENERAL1_SMALL'
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
-        HostKernel: !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
+        HostKernel:
+          !If [IsCommercialPartition, 'LINUX_KERNEL_6', !Ref 'AWS::NoValue']
         Type: 'LINUX_CONTAINER'
         EnvironmentVariables:
           - Name: BUCKET_REPORT

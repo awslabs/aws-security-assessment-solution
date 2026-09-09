@@ -1,8 +1,14 @@
 #!/bin/bash
 # This script runs the list checks command to create three text files with the latest checks. Run this from the project root.
 
+# Capture the Prowler version used to generate the check lists
+PROWLER_VERSION=$(prowler --version 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | head -n 1)
+VERSION_HEADER="# Generated with ${PROWLER_VERSION} on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
 # Get basic checks
-prowler aws --list-checks -c \
+echo "${VERSION_HEADER}" > ./checks/basic_checks.txt
+prowler aws --no-banner \
+    --list-checks -c \
     account_maintain_current_contact_details \
     awslambda_function_using_supported_runtimes \
     cloudtrail_multi_region_enabled \
@@ -17,15 +23,19 @@ prowler aws --list-checks -c \
     iam_rotate_access_key_90_days \
     s3_bucket_public_access \
     | sed 's/\x1b\[[0-9;]*m//g' \
-    > ./checks/basic_checks.txt
+    >> ./checks/basic_checks.txt
 
 # Get intermediate checks
-prowler aws --list-checks \
+echo "${VERSION_HEADER}" > ./checks/intermediate_checks.txt
+prowler aws --no-banner \
+    --list-checks \
     --severity critical high \
     | sed 's/\x1b\[[0-9;]*m//g' \
-    > ./checks/intermediate_checks.txt
+    >> ./checks/intermediate_checks.txt
 
 # Get full checks
-prowler aws --list-checks \
+echo "${VERSION_HEADER}" > ./checks/full_checks.txt
+prowler aws --no-banner \
+    --list-checks \
     | sed 's/\x1b\[[0-9;]*m//g' \
-    > ./checks/full_checks.txt
+    >> ./checks/full_checks.txt
