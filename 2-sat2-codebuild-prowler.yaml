@@ -567,14 +567,26 @@ Resources:
                           account_list=$MULTI_ACCOUNT_LIST_OVERRIDE
                       elif [[ $MULTI_ACCOUNT_LIST_OVERRIDE = '' ]]; then
                           echo "Using accounts from aws organizations."
-                          if ! account_list=$(aws organizations list-accounts --query 'Accounts[?Status==`ACTIVE`].Id' --output text); then
+                          # Organizations retires the account Status field on
+                          # 2026-09-09 and replaces it with State, so match on
+                          # either one. State needs AWS CLI 2.29.0+ to appear in
+                          # the response at all, and Status disappears after the
+                          # cutover, so filtering on only one of them silently
+                          # yields an empty account list on some CLI versions.
+                          # JMESPath resolves a key that is absent from the
+                          # response to null rather than erroring, so the field
+                          # that is not present simply never matches. ACTIVE
+                          # carries the same meaning in both fields.
+                          # https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_accounts_account_state.html
+                          if ! account_list=$(aws organizations list-accounts --query 'Accounts[?State==`ACTIVE` || Status==`ACTIVE`].Id' --output text); then
                               echo "ERROR: Failed to retrieve account list from AWS Organizations"
                               exit 1
                           fi
                       fi
 
                       if [[ -z "$account_list" ]]; then
-                          echo "ERROR: No accounts found to scan"
+                          echo "ERROR: No accounts found to scan. If this organization does have active accounts, check that the CodeBuild role can call organizations:ListAccounts and that the AWS CLI in this image returns the account State field (2.29.0 or later)."
+                          aws --version || true
                           exit 1
                       fi
 
