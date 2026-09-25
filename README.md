@@ -32,6 +32,7 @@ We have developed an inexpensive, easy to deploy, secure, and fast solution to p
   - [Basic Scan](#basic-scan)
   - [Intermediate scan](#intermediate-scan)
   - [Full scan](#full-scan)
+  - [Secrets checks](#secrets-checks)
 - [Notifications](#notifications)
 - [Reporting Summary](#reporting-summary)
   - [How the Athena table is built](#how-the-athena-table-is-built)
@@ -56,6 +57,7 @@ SATv2 can be customized by updating the CloudFormation parameters. This section 
 | Parameter                | Description                                                                                                                                                                                                                                                                                                                               | More information                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | ProwlerScanType          | Specify which type of scan to perform. Selecting full without specifying different ProwlerOptions will do a full scan. To perform a specific check, choose Full and append -c <check> to ProwlerOptions.                                                                                                                                  | [Scan types](#scan-types)                 |
+| ExcludeSecretsChecks     | Defaults to true, which skips the Prowler checks that search resource content for hardcoded secrets. Set to false to run them.                                                                                                                                                                                                            | [Secrets checks](#secrets-checks)         |
 | MultiAccountScan         | Set this to true if you want to scan all accounts in your organization. You must have deployed the prerequisite template to provision a role, or specify a different ProwlerRole with the appropriate permissions.                                                                                                                        | [Multi-account scan](#multi-account-scan) |
 | Reporting                | Set this to true if you want to summarize the Prowler reports into a single csv. This is helpful when scanning multiple accounts.                                                                                                                                                                                                         | [Reporting Summary](#reporting-summary)   |
 | EmailAddress             | Specify an address if you want to receive an email when the assessment completes.                                                                                                                                                                                                                                                         | [Notifications](#notifications)           |
@@ -469,7 +471,7 @@ You must have the AWS Command Line Interface (CLI) and valid credentials. For mo
 
 ## Scan types
 
-By default, SAT2 will run a basic scan which includes 13 checks. You can choose to run an intermediate or full check by choosing a different ProwlerScanType parameter value.
+By default, SAT2 will run an intermediate scan, which runs every critical and high severity check. You can choose to run a basic or full scan by choosing a different ProwlerScanType parameter value.
 
 For example, a single account scan using the intermediate scan option would use this command:
 
@@ -510,7 +512,7 @@ This scan will add `--severity critical high` to the Prowler scan options. With 
 ### Full scan
 To see a list of checks, review [full checks](./checks/full_checks.txt).
 
-This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running 500+ checks.
+This option doesn't add any additional parameters to the Prowler scan. It will result in Prowler running 650+ checks.
 
 You can also use the full scan to customize the scan however you would like.
 
@@ -519,6 +521,23 @@ For **ProwlerScanType** choose **Full**.
 For **ProwlerOptions**, append the check. For example, to check only if GuardDuty is enabled, enter:
 
 `aws --ignore-exit-code-3 -c guardduty_is_enabled`
+
+### Secrets checks
+By default, SATv2 skips the 23 Prowler checks that search resource content for hardcoded secrets. They cover Lambda code, layers and environment variables, ECR images, CodeCommit repositories, CloudWatch log events, EC2 user data and launch templates, CloudFormation outputs, and the configuration of Amplify, API Gateway, Batch, CodeBuild, Data Pipeline, ECS, Elastic Beanstalk, Glue, SageMaker, SSM documents, and Step Functions. The full list is the `ProwlerExclusions` mapping in the template.
+
+These checks download resource content, such as function code and container image layers, into the CodeBuild environment. Their findings can include snippets of what they matched. Skipping them keeps that content out of the scan and the reports, and shortens the scan.
+
+The exclusion applies to every scan type and is added to the Prowler command with `-e`. The check lists in the [checks](./checks) folder still include these checks, because they run when ExcludeSecretsChecks is false. Other checks in Prowler's `secrets` category, such as IMDSv2, access key rotation, and Secrets Manager rotation, check configuration rather than content and still run.
+
+To run the secrets checks, set ExcludeSecretsChecks to false:
+
+```bash
+aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
+--stack-name sat2-prowler \
+--capabilities CAPABILITY_NAMED_IAM \
+--s3-bucket $TEMPLATE_BUCKET \
+--parameter-overrides ExcludeSecretsChecks=false
+```
 
 ## Notifications
 

@@ -2,32 +2,13 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Self-Service Security Assessment Solutions (v2)
 
 Metadata:
-  cfn-lint:
-    config:
-      ignore_checks:
-        # W1030 flags CodeBuildTimeout's MaxValue of 2160 against
-        # AWS::CodeBuild::Project TimeoutInMinutes because cfn-lint's bundled
-        # resource schema still caps that property at 480 (8 hours), the limit
-        # that applied before CodeBuild raised it to 2160 (36 hours) in June
-        # 2024. CloudFormation accepts 5-2160, so the parameter range is valid
-        # and the finding is a stale-schema false positive.
-        #
-        # This has to be suppressed at the template level. A resource level
-        # ignore_checks on ProwlerCodeBuild has no effect: even though the
-        # message names Resources/ProwlerCodeBuild/Properties/TimeoutInMinutes,
-        # W1030 anchors the match on the parameter definition
-        # (Parameters/CodeBuildTimeout/MaxValue), so a resource scoped ignore
-        # never sees it.
-        #
-        # Remove this once cfn-lint picks up the updated schema.
-        - W1030
-
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: SATv2 options
         Parameters:
           - ProwlerScanType
+          - ExcludeSecretsChecks
           - MultiAccountScan
           - Reporting
           - EmailAddress
@@ -45,6 +26,8 @@ Metadata:
         default: Prowler options
       ProwlerScanType:
         default: Prowler scan type
+      ExcludeSecretsChecks:
+        default: Exclude secrets checks
       ProwlerRole:
         default: Prowler role
       MultiAccountScan:
@@ -66,13 +49,20 @@ Parameters:
     Type: String
     Default: aws --ignore-exit-code-3
   ProwlerScanType:
-    Description: 'Specify which type of scan to perform. A basic scan runs 13 checks. An Intermediate scan runs all 109+ critical and high checks. A Full scan runs all 383+ checks.'
+    Description: 'Specify which type of scan to perform. A basic scan runs 13 checks. An Intermediate scan runs all 260+ critical and high checks. A Full scan runs all 650+ checks.'
     Type: String
     AllowedValues:
       - 'Basic'
       - 'Intermediate'
       - 'Full'
     Default: 'Intermediate'
+  ExcludeSecretsChecks:
+    Description: 'Set this to true to skip the checks that search resources for hardcoded secrets (Lambda code and layers, ECR images, CodeCommit repositories, CloudWatch log events, user data, environment variables, and similar). These checks download resource content into the scan and can place snippets of what they find in the reports.'
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
   ProwlerRole:
     Description: 'The role that Prowler should assume to perform the scan.'
     Type: String
@@ -122,6 +112,10 @@ Conditions:
 
   CreateEmailNotification: !Not [!Equals [!Ref EmailAddress, '']]
 
+  ExcludeSecrets: !Equals
+    - !Ref ExcludeSecretsChecks
+    - true
+
   EnableReporting: !Equals
     - !Ref Reporting
     - true
@@ -152,6 +146,43 @@ Mappings:
       ProwlerOptions: --severity critical high
     Full:
       ProwlerOptions: ''
+  # Checks that search resource content for hardcoded secrets. Used when
+  # ExcludeSecretsChecks is true. Prowler has no way to exclude a category, and
+  # its 'secrets' category is broader than this (IMDSv2, access key age, Secrets
+  # Manager rotation, Macie), so the checks are listed by name. The first 22 run
+  # Prowler's Kingfisher secret scanner; the CodeBuild source URL check matches
+  # credentials in repository URLs with a regex.
+  #
+  # Prowler silently ignores an -e name that does not exist, so a check renamed
+  # in a later release would quietly be scanned again. Review this list whenever
+  # the prowler version in the buildspec changes. Current as of prowler 5.41.0.
+  ProwlerExclusions:
+    Secrets:
+      ProwlerOptions: >
+        -e
+        amplify_app_no_secrets_in_environment
+        apigateway_restapi_no_secrets_in_stage_variables
+        autoscaling_find_secrets_ec2_launch_configuration
+        awslambda_function_no_secrets_in_code
+        awslambda_function_no_secrets_in_variables
+        awslambda_layer_no_secrets_in_content
+        batch_job_definition_no_secrets
+        cloudformation_stack_outputs_find_secrets
+        cloudwatch_log_group_no_secrets_in_logs
+        codebuild_project_no_secrets_in_variables
+        codecommit_repository_no_secrets
+        datapipeline_pipeline_no_secrets_in_definition
+        ec2_instance_secrets_user_data
+        ec2_launch_template_no_secrets
+        ecr_repository_image_no_secrets
+        ecs_task_definitions_no_environment_secrets
+        elasticbeanstalk_environment_no_secrets_in_configuration
+        glue_catalog_connection_no_secrets
+        glue_etl_jobs_no_secrets_in_arguments
+        sagemaker_notebook_instance_no_secrets
+        ssm_document_secrets
+        stepfunctions_statemachine_no_secrets_in_definition
+        codebuild_project_source_repo_url_no_sensitive_credentials
   CodeBuildPerformanceOptionMap:
     Three:
       ParallelAccounts: 3
@@ -506,6 +537,14 @@ Resources:
                 'ProwlerOptions',
               ]
             Type: PLAINTEXT
+          - Name: PROWLER_EXCLUDE_OPTIONS
+            Value:
+              !If [
+                ExcludeSecrets,
+                !FindInMap [ProwlerExclusions, Secrets, 'ProwlerOptions'],
+                '',
+              ]
+            Type: PLAINTEXT
           - Name: PROWLER_ROLE
             Value: !Ref ProwlerRole
             Type: PLAINTEXT
@@ -596,8 +635,8 @@ Resources:
                       for accountId in $account_list; do
                           test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
                           {
-                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b
+                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
+                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b
                               PROWLER_EXIT_CODE=$?
                               if [ $PROWLER_EXIT_CODE -ne 0 ]; then
                                   echo "ERROR: Prowler scan failed for account $accountId"
@@ -610,8 +649,8 @@ Resources:
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
                       echo "Running a single account scan."
-                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
-                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE -b
+                      echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE "
+                      prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$AWS_ACCOUNT_ID:role/service-role/$PROWLER_ROLE -b
                       PROWLER_EXIT_CODE=$?
                       if [ $PROWLER_EXIT_CODE -ne 0 ]; then
                           echo "ERROR: Prowler scan failed for account $AWS_ACCOUNT_ID with exit code $PROWLER_EXIT_CODE"
