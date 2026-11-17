@@ -1693,8 +1693,10 @@ Resources:
             build:
               commands:
                 - echo "Downloading repo..."
-                - git clone https://github.com/awslabs/aws-security-assessment-solution.git
-                - cd aws-security-assessment-solution/reporting
+                - git clone --no-checkout https://github.com/awslabs/aws-security-assessment-solution.git
+                - cd aws-security-assessment-solution
+                - git checkout e966f1397c2bfeb6c7bbcee0175504e1f80afea9
+                - cd reporting
                 - echo "Uploading html dashboard to S3..."
                 - aws s3 cp satv2-dashboard.html s3://$BUCKET_REPORT/reports/
                 - echo "Done!"
