@@ -623,28 +623,47 @@ Resources:
                           fi
                       fi
 
-                      if [[ -z "$account_list" ]]; then
-                          echo "ERROR: No accounts found to scan. If this organization does have active accounts, check that the CodeBuild role can call organizations:ListAccounts and that the AWS CLI in this image returns the account State field (2.29.0 or later)."
-                          aws --version || true
+                      account_ids=()
+                      declare -A selected=()
+                      IFS=' ' read -r -a account_words <<< "${account_list//[[:space:]]/ }"
+                      for accountId in "${account_words[@]}"; do
+                          [[ -z "$accountId" ]] && continue
+                          if [[ ! "$accountId" =~ ^[0-9]{12}$ ]]; then
+                              echo "ERROR: Invalid account ID: $accountId"
+                              exit 1
+                          fi
+                          if [[ ! ${selected[$accountId]+present} ]]; then
+                              selected[$accountId]=1
+                              account_ids+=("$accountId")
+                          fi
+                      done
+                      if (( ${#account_ids[@]} == 0 )); then
+                          echo "ERROR: No accounts found to scan."
                           exit 1
                       fi
-
-                      echo "Using accounts $account_list."
-
-                      failed_accounts=()
-                      for accountId in $account_list; do
-                          test "$(jobs | wc -l)" -ge $PARALLEL_ACCOUNTS && wait || true
-                          {
-                              echo "Running Prowler as prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE "
-                              prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b
-                              PROWLER_EXIT_CODE=$?
-                              if [ $PROWLER_EXIT_CODE -ne 0 ]; then
-                                  echo "ERROR: Prowler scan failed for account $accountId"
-                                  failed_accounts+=($accountId)
-                                  exit $PROWLER_EXIT_CODE
-                              fi
-                          } &
+                      printf '%s\n' "${account_ids[@]}" > .scan-targets || exit 1
+                      : > .scan-status || exit 1
+                      pids=()
+                      batch_accounts=()
+                      wait_batch() {
+                          local i result
+                          for ((i=0; i<${#pids[@]}; i++)); do
+                              if wait "${pids[$i]}"; then result=0; else result=$?; fi
+                              printf '%s %s\n' "${batch_accounts[$i]}" "$result" >> .scan-status || return 1
+                          done
+                          pids=()
+                          batch_accounts=()
+                      }
+                      for accountId in "${account_ids[@]}"; do
+                          echo "Running Prowler for account $accountId"
+                          prowler $PROWLER_OPTIONS $PROWLER_SCAN_OPTIONS $PROWLER_EXCLUDE_OPTIONS --role arn:$AWS_PARTITION:iam::$accountId:role/service-role/$PROWLER_ROLE -b &
+                          pids+=("$!")
+                          batch_accounts+=("$accountId")
+                          if (( ${#pids[@]} >= PARALLEL_ACCOUNTS )); then
+                              wait_batch || exit 1
+                          fi
                       done
+                      wait_batch || exit 1
 
                   elif [[ $MULTI_ACCOUNT_SCAN != 'true' ]]; then
 
@@ -659,12 +678,6 @@ Resources:
 
                   fi
 
-                  wait
-
-                  if [[ ${#failed_accounts[@]} -gt 0 ]]; then
-                      echo "WARNING: Prowler scans failed for the following accounts: ${failed_accounts[*]}"
-                      echo "Check logs above for specific error details"
-                  fi
             post_build:
               commands:
                 - echo "CODEBUILD_BUILD_SUCCEEDING status is $CODEBUILD_BUILD_SUCCEEDING "
@@ -805,6 +818,75 @@ Resources:
                       PARTITION="scan_date=$SCAN_DATE/scan_time=$SCAN_TIME"
                       echo "Writing this run to partition $PARTITION"
 
+                      coverage_status=COMPLETE
+                      if [[ $MULTI_ACCOUNT_SCAN == 'true' ]]; then
+                          BUILD_UUID=${CODEBUILD_BUILD_ID##*:}
+                          if [[ ! $BUILD_UUID =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+                              echo "ERROR: Invalid CodeBuild build ID"
+                              exit 1
+                          fi
+                          if ! coverage_status=$(python3 - "$CODEBUILD_BUILD_ID" "$SCAN_DATE" "$SCAN_TIME" <<'COVERAGE_EOF'
+                  import json
+                  import re
+                  import sys
+
+                  try:
+                      with open('.scan-targets') as source:
+                          targets = source.read().splitlines()
+                      with open('.scan-status') as source:
+                          results = [line.split() for line in source]
+                      if not targets or len(set(targets)) != len(targets) or len(results) != len(targets):
+                          raise ValueError('missing or incomplete worker results')
+                      accounts = []
+                      for target, result in zip(targets, results):
+                          if not re.fullmatch(r'[0-9]{12}', target) or len(result) != 2 or result[0] != target or not re.fullmatch(r'[0-9]+', result[1]):
+                              raise ValueError('invalid worker result')
+                          code = int(result[1])
+                          if code > 255:
+                              raise ValueError('invalid worker exit code')
+                          accounts.append({'account_id': target, 'status': 'COMPLETED' if code in (0, 3) else 'FAILED', 'exit_code': code})
+                      completed = sum(account['status'] == 'COMPLETED' for account in accounts)
+                      failed = len(accounts) - completed
+                      status = 'COMPLETE' if not failed else 'PARTIAL' if completed else 'FAILED'
+                      manifest = {'schema_version': 1, 'build_id': sys.argv[1], 'scan_date': sys.argv[2], 'scan_time': sys.argv[3], 'status': status, 'counts': {'targeted': len(accounts), 'completed': completed, 'failed': failed}, 'accounts': accounts}
+                      with open('.scan-coverage.json', 'w') as output:
+                          json.dump(manifest, output)
+                      print('Coverage: %s, targeted=%d completed=%d failed=%d' % (status, len(accounts), completed, failed), file=sys.stderr)
+                      print(status)
+                  except (OSError, ValueError) as error:
+                      print('ERROR: Cannot validate worker results:', error, file=sys.stderr)
+                      sys.exit(1)
+                  COVERAGE_EOF
+                          ); then
+                              exit 1
+                          fi
+                          case "$coverage_status" in
+                              COMPLETE|PARTIAL|FAILED) ;;
+                              *) echo "ERROR: Invalid coverage status: $coverage_status"; exit 1 ;;
+                          esac
+                          coverage_path="s3://$BUCKET_REPORT/coverage/$PARTITION/$BUILD_UUID.json"
+                          echo "Publishing coverage to $coverage_path"
+                          if ! aws s3 cp .scan-coverage.json "$coverage_path"; then
+                              echo "ERROR: Coverage upload failed"
+                              if [[ $coverage_status != PARTIAL ]]; then exit 1; fi
+                          fi
+                          if [[ $coverage_status == FAILED ]]; then exit 1; fi
+                          if [[ $coverage_status == PARTIAL ]]; then
+                              partial="s3://$BUCKET_REPORT/partial/$PARTITION/$BUILD_UUID"
+                              echo "Uploading partial raw findings to $partial"
+                              aws s3 cp --exclude "*" --include "*.csv" --exclude "compliance**" output/ "$partial/csv/" --recursive || true
+                              if [ -d output/compliance ]; then
+                                  aws s3 cp --exclude "*" --include "*.csv" output/compliance/ "$partial/compliance/" --recursive || true
+                              fi
+                              aws s3 cp --exclude "*" --include "*.ocsf.json" output/ "$partial/ocsf-json/" --recursive || true
+                              aws s3 cp --exclude "*" --include "*.json" --exclude "*.ocsf.json" --exclude "*.asff.json" output/ "$partial/json/" --recursive || true
+                              aws s3 cp --exclude "*" --include "*.html" output/ "$partial/html/" --recursive || true
+                              aws s3 cp --exclude "*" --include "*.asff.json" output/ "$partial/asff-json/" --recursive || true
+                              exit 1
+                          fi
+                          if [[ $coverage_status != COMPLETE ]]; then exit 1; fi
+                      fi
+
                       upload_failed=false
 
                       echo "Converting CSV findings to Parquet for Athena..."
@@ -941,9 +1023,9 @@ Resources:
               build-status: $.detail.build-status
               bucket: $.detail.additional-information.environment.environment-variables[0].value
             InputTemplate: >-
-              "The Prowler scan has <build-status>."
+              "The CodeBuild run has <build-status>. This is not the assessment coverage status."
 
-              "You can view your results in the <bucket> bucket."
+              "View results in the <bucket> bucket. For multi-account coverage, check the coverage/ prefix; a missing manifest does not imply completeness."
 
   GlueDatabaseSATv2Findings:
     Condition: EnableReporting

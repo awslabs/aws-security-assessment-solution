@@ -393,7 +393,7 @@ Determine if you have delegated administrator or a resource policy that already 
 </details>
 
 ## Review the results
-After the solution is deployed, a Lambda function starts the CodeBuild project. After the CodeBuild project is finished building, the Prowler results will be uploaded to the created Amazon S3 bucket. If you configured [notifications](#notifications), you will get an email when the Prowler scan is complete. If you configured [reporting](#reporting-summary), you will have a consolidated csv file in the /reports folder.
+After the solution is deployed, a Lambda function starts the CodeBuild project. If you configured [notifications](#notifications), you will get an email reporting the CodeBuild status, not assessment coverage. Completed runs upload Prowler results to the created Amazon S3 bucket. If you configured [reporting](#reporting-summary), a successful run can produce a consolidated csv file in the /reports folder. An incomplete multi-account run does not refresh that report.
 
 If you didn't configure email alerts, you can monitor the progress from the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects).
 
@@ -417,7 +417,11 @@ To review the results, follow these steps.
     reports/                                           consolidated CSV and dashboard
     ```
 
-    Every run gets its own folder, so running the solution again never mixes new findings in with old ones, including when you run it more than once on the same day. Previous runs are kept so you can compare them.
+    Normal findings use the scan start time to the second, so runs starting in the same second share a partition. Previous runs are kept so you can compare them.
+
+    For a multi-account run, check `coverage/scan_date=YYYY-MM-DD/scan_time=HHMMSS/<build-uuid>.json` for the selected accounts, their Prowler exit codes and the totals. `COMPLETE` means all workers completed, `PARTIAL` means some completed, and `FAILED` means none completed. Exit codes 0 and 3 count as completed; completion does not guarantee every API call or check succeeded. A missing manifest does not imply completeness, and a complete manifest does not guarantee later artifact uploads succeeded.
+
+    A partial run fails CodeBuild and attempts to preserve raw files under `partial/scan_date=YYYY-MM-DD/scan_time=HHMMSS/<build-uuid>/<format>/`. Files from failed accounts may be incomplete. Partial results are not uploaded to the normal Parquet prefix and do not refresh the consolidated report, which may still show an earlier run. An all-failed run uploads no findings. Check CodeBuild logs if coverage or artifact uploads fail.
 
 4. For each account, there will be 4 file types (csv, html, json, json-ocsf) in the format `prowler-output-<aws-account-id>-<datetime>`.
 
