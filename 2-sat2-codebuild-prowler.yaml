@@ -1171,6 +1171,77 @@ Resources:
               failed_checks desc
       WorkGroup: !Ref SATv2Reporting
 
+  qProwlerScanComparison:
+    Condition: EnableReporting
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref GlueDatabaseSATv2Findings
+      Description: 'Compare findings between two scans'
+      Name: 'Prowler scan comparison'
+      QueryString: !Sub |
+          WITH baseline_rows AS (
+              SELECT * FROM "${GlueDatabaseSATv2Findings}"."prowler"
+              WHERE scan_date = ? AND scan_time = ?
+                  AND nullif(trim(account_uid), '') IS NOT NULL
+                  AND nullif(trim(finding_uid), '') IS NOT NULL
+          ), followup_rows AS (
+              SELECT * FROM "${GlueDatabaseSATv2Findings}"."prowler"
+              WHERE scan_date = ? AND scan_time = ?
+                  AND nullif(trim(account_uid), '') IS NOT NULL
+                  AND nullif(trim(finding_uid), '') IS NOT NULL
+          ), observations AS (
+              SELECT 'baseline' AS snapshot, * FROM baseline_rows
+              UNION ALL
+              SELECT 'followup' AS snapshot, * FROM followup_rows
+          ), findings AS (
+              SELECT
+                  snapshot, account_uid, finding_uid,
+                  CASE WHEN count(DISTINCT CASE WHEN status IS NULL OR trim(status) = '' THEN 'UNKNOWN' ELSE status END) > 1
+                      THEN 'CONFLICT'
+                      ELSE min(CASE WHEN status IS NULL OR trim(status) = '' THEN 'UNKNOWN' ELSE status END)
+                  END AS finding_status,
+                  count(DISTINCT CASE WHEN status IS NULL OR trim(status) = '' THEN 'UNKNOWN' ELSE status END) > 1 AS has_conflict,
+                  max(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) AS has_fail,
+                  max(CASE WHEN muted = true THEN 1 ELSE 0 END) = 1 AS any_muted,
+                  min(region) AS region,
+                  min(check_id) AS check_id,
+                  min(resource_uid) AS resource_uid,
+                  min(severity) AS severity
+              FROM observations
+              GROUP BY snapshot, account_uid, finding_uid
+          ), comparison AS (
+              SELECT
+                  coalesce(b.account_uid, f.account_uid) AS account_uid,
+                  coalesce(b.finding_uid, f.finding_uid) AS finding_uid,
+                  CASE WHEN f.finding_uid IS NOT NULL THEN f.region ELSE b.region END AS region,
+                  CASE WHEN f.finding_uid IS NOT NULL THEN f.check_id ELSE b.check_id END AS check_id,
+                  CASE WHEN f.finding_uid IS NOT NULL THEN f.resource_uid ELSE b.resource_uid END AS resource_uid,
+                  CASE WHEN f.finding_uid IS NOT NULL THEN f.severity ELSE b.severity END AS severity,
+                  b.finding_status AS baseline_status,
+                  f.finding_status AS followup_status,
+                  b.any_muted AS baseline_muted,
+                  f.any_muted AS followup_muted,
+                  CASE
+                      WHEN b.has_conflict OR f.has_conflict THEN 'NOT_CONFIRMED'
+                      WHEN b.finding_status = 'PASS' AND f.finding_status = 'FAIL' THEN 'NEW_FAIL'
+                      WHEN b.finding_status = 'FAIL' AND f.finding_status = 'FAIL' THEN 'STILL_FAILING'
+                      WHEN b.finding_status = 'FAIL' AND f.finding_status = 'PASS' THEN 'NOW_PASSING'
+                      WHEN f.finding_status = 'FAIL' THEN 'FIRST_OBSERVED_FAIL'
+                      ELSE 'NOT_CONFIRMED'
+                  END AS change
+              FROM (SELECT * FROM findings WHERE snapshot = 'baseline') b
+              FULL OUTER JOIN (SELECT * FROM findings WHERE snapshot = 'followup') f
+                  ON b.account_uid = f.account_uid AND b.finding_uid = f.finding_uid
+              WHERE coalesce(b.has_fail, 0) = 1 OR coalesce(f.has_fail, 0) = 1
+          )
+          SELECT change, account_uid, finding_uid, region, check_id, resource_uid, severity,
+              baseline_status, followup_status, baseline_muted, followup_muted
+          FROM comparison
+          WHERE (SELECT min(concat(scan_date, scan_time)) FROM baseline_rows)
+              < (SELECT min(concat(scan_date, scan_time)) FROM followup_rows)
+          ORDER BY account_uid, finding_uid
+      WorkGroup: !Ref SATv2Reporting
+
   AthenaStartQueryLambdaRole:
     Condition: EnableReporting
     Type: 'AWS::IAM::Role'

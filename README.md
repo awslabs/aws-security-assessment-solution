@@ -621,12 +621,13 @@ aws cloudformation deploy --template-file 2-sat2-codebuild-prowler.yaml \
 
 ![reporting architecture diagram](img/reporting2.png)
 
-Two saved queries are created as examples:
+Three saved queries are created as examples:
 
 | Saved query                  | What it shows                                                          |
 | ---------------------------- | ---------------------------------------------------------------------- |
 | Prowler organization summary | Failed checks across every assessed account, for the most recent scan. |
 | Prowler scan trend           | Failed checks per scan date and severity, to compare runs over time.   |
+| Prowler scan comparison      | Finding status changes between two selected scans.                     |
 
 To review and run a query, follow these steps:
 
@@ -640,6 +641,20 @@ To review and run a query, follow these steps:
 5. Choose **Run** to run the query.
 
     ![Athena saved query results](/img/athena-query-results.png)
+
+For **Prowler scan comparison**, first identify two UTC partition keys in the same workgroup:
+
+```sql
+SELECT DISTINCT scan_date, scan_time
+FROM "{bucket_name}"."prowler"
+ORDER BY scan_date, scan_time
+```
+
+Run the saved query with four execution parameters in this order: baseline date, baseline time, follow-up date, follow-up time. Enter each as a quoted string, for example `'2026-11-20'`, `'010203'`, `'2026-11-20'`, `'020304'`. The baseline must be earlier than the follow-up. See [Athena execution parameters](https://docs.aws.amazon.com/athena/latest/ug/querying-with-prepared-statements-running-queries-with-execution-parameters-in-the-athena-console.html).
+
+The query matches account and finding IDs, includes muted findings, and reports whether either scan had a muted observation. `NEW_FAIL` means PASS changed to FAIL; `FIRST_OBSERVED_FAIL` means the baseline had no PASS or FAIL for that finding; `STILL_FAILING` means FAIL in both; `NOW_PASSING` means FAIL changed to PASS. `NOT_CONFIRMED` includes a missing follow-up or a follow-up status other than PASS or FAIL after baseline FAIL, and any conflicting statuses within a scan. Missing findings and conflicts do not prove remediation. Compare runs with the same coverage and Prowler version because scope or version changes can change findings.
+
+No rows can mean neither valid scan contains a failure, a selected scan has no identifiable findings, or the keys are equal or reversed. Keys select partitions, not build IDs: builds started in the same UTC second share a partition. Use another scan to verify remediation for an individual build when partitions collide.
 
 ## Frequently Asked Questions (FAQ)
 
